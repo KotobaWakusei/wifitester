@@ -74,6 +74,16 @@ public final class DashboardActivity extends Activity {
         audit.setOnClickListener(v->startActivity(new Intent(this,WiFiAuditActivity.class)));
         root.addView(audit,bottom());
 
+        LinearLayout tools=card();
+        tools.setOnClickListener(v->startActivity(new Intent(this,AircrackToolkitActivity.class)));
+        tools.addView(text("03  /  AIRCRACK-NG 工具链",12,ACCENT,true));
+        tools.addView(text("Aircrack-ng 图形工作台",20,Color.WHITE,true),top(8));
+        tools.addView(text("检测工具环境、进入被动监听、只读分析已有抓包文件。",13,MUTED,false),top(6));
+        TextView toolsAction=text("打开工具工作台   →",14,ACCENT,true);
+        toolsAction.setPadding(0,dp(14),0,0);
+        tools.addView(toolsAction);
+        root.addView(tools,bottom());
+
         LinearLayout info=card();
         info.addView(text("设备兼容性",16,Color.WHITE,true));
         summary=text("尚未检测无线能力。进入监听工作台后将检查接口、工具和驱动公开的频道。",13,MUTED,false);

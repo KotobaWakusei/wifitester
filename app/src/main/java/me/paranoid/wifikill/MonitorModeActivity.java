@@ -255,13 +255,15 @@ public final class MonitorModeActivity extends Activity {
                 if(packetLimit!=5000&&packetLimit!=20000&&packetLimit!=50000)packetLimit=50000;
                 int snaplen=getSharedPreferences("wifitester_settings",MODE_PRIVATE).getInt("capture_snaplen",512);
                 if(snaplen!=256&&snaplen!=512&&snaplen!=1024)snaplen=512;
+                final int capturePacketLimit=packetLimit;
+                final int captureSnaplen=snaplen;
                 String shell=new BundledToolchain(this).shellEnvironment()
                         +"umask 022; tcpdump -i "+iface+" -U -n -s "+snaplen+" -c "+packetLimit+" -w "+path
                         +" & CAPTURE_PID=$!; echo WIFITESTER_CAPTURE_PID:$CAPTURE_PID; wait \"$CAPTURE_PID\"; "
                         +"RC=$?; chown "+owner+":"+owner+" "+path+" >/dev/null 2>&1 || true; chmod 600 "+path+" >/dev/null 2>&1 || true; exit $RC";
                 Process process=new ProcessBuilder("su","-c",shell).redirectErrorStream(true).start();
                 captureProcess=process;
-                runOnUiThread(()->append("被动 PCAP 捕获已启动：最多 "+packetLimit+" 帧，snaplen "+snaplen+"；文件："+target.getName()));
+                runOnUiThread(()->append("被动 PCAP 捕获已启动：最多 "+capturePacketLimit+" 帧，snaplen "+captureSnaplen+"；文件："+target.getName()));
                 try(BufferedReader reader=new BufferedReader(new InputStreamReader(process.getInputStream()))){
                     String line;
                     while((line=reader.readLine())!=null){

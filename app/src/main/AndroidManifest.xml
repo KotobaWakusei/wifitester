@@ -39,7 +39,7 @@
         <activity
             android:name="me.paranoid.wifikill.MonitorModeActivity"
             android:exported="false"
-            android:label="Monitor Mode"
+            android:label="监听模式"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
 
@@ -48,8 +48,8 @@
         <activity
             android:name="me.paranoid.wifikill.WiFiAuditActivity"
             android:exported="false"
-            android:label="Wi-Fi security audit"
-            android:theme="@android:style/Theme.Holo" />
+            android:label="Wi-Fi 网络信息"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
 
         <service
             android:name="me.paranoid.wifikill.service.WFKService"

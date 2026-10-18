@@ -38,16 +38,16 @@ public final class DashboardActivity extends Activity {
         root.setPadding(dp(22),dp(26),dp(22),dp(28));
         scroll.addView(root);
 
-        root.addView(text("WIFIKILL  /  WIRELESS LAB",11,ACCENT,true));
-        TextView title=text("Wireless\nWorkbench",32,Color.WHITE,true);
+        root.addView(text("WIFITESTER  /  无线诊断工作台",11,ACCENT,true));
+        TextView title=text("无线诊断\n工作台",32,Color.WHITE,true);
         title.setPadding(0,dp(10),0,dp(7));
         root.addView(title);
         root.addView(text("无线诊断、驱动能力检测与被动分析",14,MUTED,false));
 
         LinearLayout rootCard=card();
         rootCard.setOnClickListener(v->refreshRoot());
-        rootCard.addView(text("ROOT AUTHORIZATION",11,ACCENT,true));
-        rootValue=text("检测中…",22,Color.WHITE,true);
+        rootCard.addView(text("ROOT 权限状态",11,ACCENT,true));
+        rootValue=text("正在检测…",22,Color.WHITE,true);
         rootValue.setPadding(0,dp(8),0,dp(4));
         rootCard.addView(rootValue);
         rootDetail=text("正在验证 su 是否实际授予 UID 0 权限",13,MUTED,false);
@@ -59,28 +59,28 @@ public final class DashboardActivity extends Activity {
 
         LinearLayout monitor=card();
         monitor.setOnClickListener(v->startActivity(new Intent(this,MonitorModeActivity.class)));
-        monitor.addView(text("01  /  MONITOR MODE",12,ACCENT,true));
-        monitor.addView(text("被动无线监听",21,Color.WHITE,true), top(8));
-        monitor.addView(text("自动选择无线接口 · 驱动频道枚举 · 实时抓包 · 导出诊断",13,MUTED,false), top(6));
+        monitor.addView(text("01  /  监听模式",12,ACCENT,true));
+        monitor.addView(text("无线监听工作台",21,Color.WHITE,true), top(8));
+        monitor.addView(text("接口检测 · 驱动频道枚举 · 被动抓包 · 诊断报告导出",13,MUTED,false), top(6));
         TextView action=text("打开监听工作台   →",14,ACCENT,true);
         action.setPadding(0,dp(14),0,0);
         monitor.addView(action);
         root.addView(monitor,bottom());
 
         LinearLayout audit=card();
-        audit.addView(text("02  /  READ-ONLY AUDIT",12,ACCENT,true));
-        audit.addView(text("Wi-Fi 安全审计",19,Color.WHITE,true),top(8));
-        audit.addView(text("查看本机可见的网络状态与诊断信息。",13,MUTED,false),top(5));
+        audit.addView(text("02  /  只读审计",12,ACCENT,true));
+        audit.addView(text("Wi-Fi 网络信息",19,Color.WHITE,true),top(8));
+        audit.addView(text("查看附近可见的 Wi-Fi 网络、信号强度、频段和安全类型。",13,MUTED,false),top(5));
         audit.setOnClickListener(v->startActivity(new Intent(this,WiFiAuditActivity.class)));
         root.addView(audit,bottom());
 
         LinearLayout info=card();
-        info.addView(text("兼容性状态",16,Color.WHITE,true));
-        summary=text("尚未检测无线能力。进入监听工作台后会枚举驱动声明的频道，并实际验证接口创建。",13,MUTED,false);
+        info.addView(text("设备兼容性",16,Color.WHITE,true));
+        summary=text("尚未检测无线能力。进入监听工作台后将检查接口、工具和驱动公开的频道。",13,MUTED,false);
         summary.setPadding(0,dp(8),0,0);
         info.addView(summary);
         root.addView(info);
-        TextView footer=text("PASSIVE BY DEFAULT  ·  NO RADIO INJECTION",10,MUTED,true);
+        TextView footer=text("默认被动接收  ·  不发送无线注入",10,MUTED,true);
         footer.setGravity(Gravity.CENTER);
         footer.setPadding(0,dp(24),0,0);
         root.addView(footer);
@@ -90,7 +90,7 @@ public final class DashboardActivity extends Activity {
     private void refreshRoot() {
         if(checking || rootValue==null) return;
         checking=true;
-        rootValue.setText("检测中…");
+        rootValue.setText("正在检测…");
         worker.execute(()->{
             String out="";
             int code=-1;
@@ -115,7 +115,7 @@ public final class DashboardActivity extends Activity {
                 if(!finished){
                     p.destroy();
                     try{reader.join(1000L);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();}
-                    out="Root check timed out after 15 seconds. Check whether the root manager is waiting for authorization.";
+                    out="Root 权限检测超时（15 秒）。请检查 Root 管理器是否正在等待授权。";
                     code=-1;
                 }else{
                     reader.join(1500L);
@@ -137,7 +137,7 @@ public final class DashboardActivity extends Activity {
     // trigger root-manager authorization prompts when access has been denied.
     @Override protected void onResume(){super.onResume();refreshRoot();}
     @Override protected void onDestroy(){worker.shutdownNow();super.onDestroy();}
-    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(17),dp(17),dp(17),dp(17));l.setBackground(round(PANEL,dp(18)));return l;}
+    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(18),dp(18),dp(18),dp(18));GradientDrawable bg=round(PANEL,dp(18));bg.setStroke(dp(1),0xff26344c);l.setBackground(bg);l.setElevation(dp(2));return l;}
     private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(radius);return d;}
     private LinearLayout.LayoutParams bottom(){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(12);return p;}

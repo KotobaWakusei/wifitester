@@ -117,7 +117,7 @@ public final class DashboardActivity extends Activity {
             String out="";
             int code=-1;
             try {
-                Process p=new ProcessBuilder("su","-c","id; for t in aircrack-ng airodump-ng airmon-ng tcpdump iw ip capinfos tshark; do p=$(command -v \\"$t\\" 2>/dev/null || true); if [ -z \\"$p\\" ]; then for q in /data/data/com.termux/files/usr/bin/\\"$t\\" /system/bin/\\"$t\\" /usr/bin/\\"$t\\" /usr/sbin/\\"$t\\"; do [ -x \\"$q\\" ] && { p=\\"$q\\"; break; }; done; fi; if [ -n \\"$p\\" ]; then printf \\"TOOL:%s:%s\\\\n\\" \\"$t\\" \\"$p\\"; else printf \\"TOOL:%s:MISSING\\\\n\\" \\"$t\\"; fi; done").redirectErrorStream(true).start();
+                Process p=new ProcessBuilder("su","-c","id; for t in aircrack-ng airodump-ng airmon-ng tcpdump iw ip capinfos tshark; do p=$(command -v $t 2>/dev/null || true); if [ -z \"$p\" ]; then for q in /data/data/com.termux/files/usr/bin/$t /system/bin/$t /usr/bin/$t /usr/sbin/$t; do [ -x \"$q\" ] && { p=\"$q\"; break; }; done; fi; if [ -n \"$p\" ]; then printf 'TOOL:%s:%s\\n' \"$t\" \"$p\"; else printf 'TOOL:%s:MISSING\\n' \"$t\"; fi; done").redirectErrorStream(true).start();
                 StringBuilder b=new StringBuilder();
                 Thread reader=new Thread(()->{
                     try(BufferedReader r=new BufferedReader(new InputStreamReader(p.getInputStream()))){
@@ -151,6 +151,15 @@ public final class DashboardActivity extends Activity {
                 rootValue.setText(granted?"Root 已授权":"Root 不可用");
                 rootValue.setTextColor(granted?0xff79e0b0:0xffffa1a1);
                 rootDetail.setText(granted?"su 命令已实际返回 UID 0":"请在 Root 管理器中授权本应用；仅存在 su 文件不代表已授权。\n"+result);
+                StringBuilder tools=new StringBuilder();
+                for(String line:result.split("\\n")){
+                    if(!line.startsWith("TOOL:"))continue;
+                    String[] parts=line.split(":",3);
+                    if(parts.length<3)continue;
+                    if(tools.length()>0)tools.append("\\n");
+                    tools.append(parts[1]).append("  ·  ").append("MISSING".equals(parts[2])?"未安装":parts[2]);
+                }
+                toolchainSummary.setText(granted?(tools.length()==0?"已获得 Root，但未读取到工具检测结果。":tools.toString()):"需要先授予 Root 权限，才能检测系统工具。");
             });
         });
     }

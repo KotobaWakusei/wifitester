@@ -1,0 +1,157 @@
+1<?xml version="1.0" encoding="utf-8"?>
+2<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+3    package="me.paranoid.wifikill"
+4    android:versionCode="2020"
+5    android:versionName="2.2-mod" >
+6
+7    <uses-sdk
+8        android:minSdkVersion="21"
+9        android:targetSdkVersion="34" />
+10
+11    <uses-permission android:name="android.permission.INTERNET" />
+11-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:4:5-67
+11-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:4:22-64
+12    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+12-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:5:5-79
+12-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:5:22-76
+13    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+13-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:6:5-76
+13-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:6:22-73
+14    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+14-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:7:5-76
+14-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:7:22-73
+15    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+15-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:8:5-81
+15-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:8:22-78
+16    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+16-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:9:5-79
+16-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:9:22-76
+17    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
+17-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:10:5-78
+17-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:10:22-75
+18    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+18-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:11:5-77
+18-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:11:22-74
+19    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+19-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:12:5-77
+19-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:12:22-74
+20    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+20-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:13:5-87
+20-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:13:22-84
+21    <uses-permission android:name="android.permission.WAKE_LOCK" />
+21-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:14:5-68
+21-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:14:22-65
+22    <uses-permission android:name="android.permission.VIBRATE" />
+22-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:15:5-66
+22-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:15:22-63
+23
+24    <uses-feature
+24-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:17:5-19:36
+25        android:name="android.hardware.wifi"
+25-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:18:9-45
+26        android:required="false" />
+26-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:19:9-33
+27
+28    <application
+28-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:21:5-76:19
+29        android:allowBackup="true"
+29-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:22:9-35
+30        android:debuggable="true"
+31        android:extractNativeLibs="true"
+32        android:hardwareAccelerated="true"
+32-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:25:9-43
+33        android:icon="@drawable/icon"
+33-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:23:9-38
+34        android:label="@string/app_name"
+34-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:24:9-41
+35        android:usesCleartextTraffic="true" >
+35-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:26:9-44
+36        <activity
+36-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:28:9-38:20
+37            android:name="me.paranoid.wifikill.WiFiKill"
+37-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:29:13-57
+38            android:exported="true"
+38-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:30:13-36
+39            android:label="@string/app_name"
+39-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:31:13-45
+40            android:launchMode="singleInstance"
+40-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:32:13-48
+41            android:theme="@android:style/Theme.Holo" >
+41-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:33:13-54
+42            <intent-filter>
+42-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:34:13-37:29
+43                <action android:name="android.intent.action.MAIN" />
+43-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:35:17-69
+43-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:35:25-66
+44
+45                <category android:name="android.intent.category.LAUNCHER" />
+45-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:36:17-77
+45-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:36:27-74
+46            </intent-filter>
+47        </activity>
+48        <activity
+48-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:40:9-45:57
+49            android:name="me.paranoid.wifikill.DetailsActivity"
+49-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:41:13-64
+50            android:exported="false"
+50-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:42:13-37
+51            android:label="@string/app_name"
+51-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:43:13-45
+52            android:launchMode="singleInstance"
+52-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:44:13-48
+53            android:theme="@android:style/Theme.Holo" />
+53-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:45:13-54
+54        <activity
+54-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:47:9-51:57
+55            android:name="me.paranoid.wifikill.Preferences"
+55-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:48:13-60
+56            android:exported="false"
+56-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:49:13-37
+57            android:label="@string/app_name"
+57-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:50:13-45
+58            android:theme="@android:style/Theme.Holo" />
+58-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:51:13-54
+59        <activity
+59-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:53:9-57:57
+60            android:name="me.paranoid.wifikill.WiFiAuditActivity"
+60-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:54:13-66
+61            android:exported="false"
+61-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:55:13-37
+62            android:label="Wi-Fi security audit"
+62-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:56:13-49
+63            android:theme="@android:style/Theme.Holo" />
+63-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:57:13-54
+64        <activity
+64-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:59:9-63:57
+65            android:name="me.paranoid.wifikill.LocalDeauthActivity"
+65-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:60:13-68
+66            android:exported="false"
+66-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:61:13-37
+67            android:label="On-device wireless tools"
+67-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:62:13-53
+68            android:theme="@android:style/Theme.Holo" />
+68-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:63:13-54
+69        <activity
+69-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:65:9-69:57
+70            android:name="me.paranoid.wifikill.EspDeautherActivity"
+70-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:66:13-68
+71            android:exported="false"
+71-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:67:13-37
+72            android:label="ESP8266 Deauther"
+72-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:68:13-45
+73            android:theme="@android:style/Theme.Holo" />
+73-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:69:13-54
+74
+75        <service
+75-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:71:9-75:48
+76            android:name="me.paranoid.wifikill.service.WFKService"
+76-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:72:13-67
+77            android:exported="false"
+77-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:73:13-37
+78            android:foregroundServiceType="dataSync"
+78-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:74:13-53
+79            android:label="@string/app_name" />
+79-->/home/kali/Desktop/WifiKiller/app/src/main/AndroidManifest.xml:75:13-45
+80    </application>
+81
+82</manifest>

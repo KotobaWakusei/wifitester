@@ -1,0 +1,7 @@
+me.paranoid.wifikill.app-pngs-0 /home/kali/Desktop/WifiKiller/app/build/generated/res/pngs/debug
+me.paranoid.wifikill.app-resValues-1 /home/kali/Desktop/WifiKiller/app/build/generated/res/resValues/debug
+me.paranoid.wifikill.app-mergeDebugResources-2 /home/kali/Desktop/WifiKiller/app/build/intermediates/incremental/debug/mergeDebugResources/merged.dir
+me.paranoid.wifikill.app-mergeDebugResources-3 /home/kali/Desktop/WifiKiller/app/build/intermediates/incremental/debug/mergeDebugResources/stripped.dir
+me.paranoid.wifikill.app-debug-4 /home/kali/Desktop/WifiKiller/app/build/intermediates/merged_res/debug/mergeDebugResources
+me.paranoid.wifikill.app-debug-5 /home/kali/Desktop/WifiKiller/app/src/debug/res
+me.paranoid.wifikill.app-main-6 /home/kali/Desktop/WifiKiller/app/src/main/res

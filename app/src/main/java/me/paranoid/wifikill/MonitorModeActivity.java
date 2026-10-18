@@ -246,7 +246,7 @@ public final class MonitorModeActivity extends Activity {
     private void beginCapture(){
         new Thread(()->{
             try{
-                captureProcess=new ProcessBuilder("su","-c","exec tcpdump -i '"+selectedMonitor+"' -n -e -l").redirectErrorStream(true).start();
+                captureProcess=new ProcessBuilder("su","-c",new BundledToolchain(this).shellEnvironment()+"exec tcpdump -i '"+selectedMonitor+"' -n -e -l").redirectErrorStream(true).start();
                 try(BufferedReader reader=new BufferedReader(new InputStreamReader(captureProcess.getInputStream()))){
                     String line;while((line=reader.readLine())!=null){final String item=line;runOnUiThread(()->append(item));}
                 }

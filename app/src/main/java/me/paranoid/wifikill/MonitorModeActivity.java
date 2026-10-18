@@ -201,7 +201,8 @@ public final class MonitorModeActivity extends Activity {
                     "if ! iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then "+
                     "iw dev \"$IF\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; exit $rc; }; fi; "+
                     "echo MONITOR_CREATED; "+
-                    "iw dev \"$MON\" set freq "+channel.frequency+" HT20 || { rc=$?; echo CHANNEL_SET_FAILED:$rc; echo CHANNEL_DIAGNOSTICS_BEGIN; iw dev \"$MON\" info 2>&1; iw list 2>&1 | sed -n '/Frequencies:/,/valid interface combinations:/p' | head -n 100; echo CHANNEL_DIAGNOSTICS_END; exit $rc; }; "+
+                    "iw dev \"$MON\" set freq "+channel.frequency+" HT20 || { freq_rc=$?; echo CHANNEL_FREQ_FAILED:$freq_rc; "+ 
+                    "iw dev \"$MON\" set channel "+channel.number+" HT20 || { rc=$?; echo CHANNEL_SET_FAILED:$rc; echo CHANNEL_DIAGNOSTICS_BEGIN; iw dev \"$MON\" info 2>&1; iw list 2>&1 | sed -n '/Frequencies:/,/valid interface combinations:/p' | head -n 100; echo CHANNEL_DIAGNOSTICS_END; exit $rc; }; }; "+
                     "ip link set \"$MON\" up || { rc=$?; echo MONITOR_UP_FAILED:$rc; exit $rc; }; echo MONITOR_READY";
             Result r=runRoot(cmd,12000);
             final String oldState=state;

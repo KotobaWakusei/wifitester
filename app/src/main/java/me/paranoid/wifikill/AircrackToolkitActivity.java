@@ -75,7 +75,7 @@ public final class AircrackToolkitActivity extends Activity {
 
         LinearLayout capture=card();
         capture.addView(text("02  /  抓包文件分析",16,Color.WHITE,true));
-        capture.addView(text("选择已有的 PCAP/PCAPNG 文件。优先使用 capinfos 或 tshark 读取文件元数据；不会修改原文件，也不会尝试恢复密码。",13,MUTED,false),top(7));
+        capture.addView(text("选择已有的 PCAP/PCAPNG 文件。优先使用 capinfos 或 tshark；若不可用则用内置 tcpdump 只读显示前 20 个数据包摘要，不会修改原文件或尝试恢复密码。",13,MUTED,false),top(7));
         captureButton=button("选择抓包文件",0xff263a56);
         captureButton.setOnClickListener(v->openCapture());
         capture.addView(captureButton,top(12));
@@ -166,7 +166,7 @@ public final class AircrackToolkitActivity extends Activity {
                     "elif [ -x /data/data/com.termux/files/usr/bin/capinfos ]; then /data/data/com.termux/files/usr/bin/capinfos "+quoted+"; "+
                     "elif command -v tshark >/dev/null 2>&1; then tshark -r "+quoted+" -q -z io,phs; "+
                     "elif [ -x /data/data/com.termux/files/usr/bin/tshark ]; then /data/data/com.termux/files/usr/bin/tshark -r "+quoted+" -q -z io,phs; "+
-                    "else echo '未找到 capinfos 或 tshark。请先在受信任的环境中安装 Wireshark CLI 工具。'; exit 127; fi";
+                    "elif command -v tcpdump >/dev/null 2>&1; then tcpdump -nn -r "+quoted+" -c 20 2>&1; else echo '未找到 capinfos、tshark 或 tcpdump。'; exit 127; fi";
                 Result result=runRoot(cmd,20000);
                 output="文件："+uri.getLastPathSegment()+"\n退出码："+result.code+"\n\n"+result.output;
                 code=result.code;

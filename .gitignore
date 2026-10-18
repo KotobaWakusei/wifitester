@@ -1,0 +1,12 @@
+# Gradle / Android outputs
+.gradle/
+**/build/
+local.properties
+*.iml
+.idea/
+*.hprof
+*.jks
+*.keystore
+captures/
+*.pcap
+*.pcapng

@@ -18,6 +18,8 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileInputStream;
+import java.io.OutputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -31,8 +33,9 @@ public final class AircrackToolkitActivity extends Activity {
     private static final int OPEN_CAPTURE=7401;
     private final ExecutorService worker=Executors.newSingleThreadExecutor();
     private TextView toolStatus, report;
-    private Button detectButton, captureButton;
+    private Button detectButton, captureButton, exportAnalysisButton;
     private boolean busy;
+    private String latestAnalysisReport = "";
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -83,6 +86,10 @@ public final class AircrackToolkitActivity extends Activity {
         report.setPadding(dp(12),dp(12),dp(12),dp(12));
         report.setBackground(round(0xff101827,dp(12)));
         capture.addView(report,top(10));
+        exportAnalysisButton=button("导出分析报告",0xff315d91);
+        exportAnalysisButton.setEnabled(false);
+        exportAnalysisButton.setOnClickListener(v->exportAnalysisReport());
+        capture.addView(exportAnalysisButton,top(10));
         root.addView(capture,bottom(12));
 
         LinearLayout audit=card();
@@ -105,13 +112,7 @@ public final class AircrackToolkitActivity extends Activity {
         detectButton.setEnabled(false);
         toolStatus.setText("正在检测 Root 和工具路径…");
         worker.execute(()->{
-            String command="printf 'UID: '; id; "+
-                "for t in aircrack-ng airodump-ng airmon-ng capinfos tshark tcpdump iw ip; do "+
-                "p=$(command -v \"$t\" 2>/dev/null || true); "+
-                "if [ -z \"$p\" ]; then "+
-                "for q in /data/data/com.termux/files/usr/bin/\"$t\" /system/bin/\"$t\" /usr/bin/\"$t\" /usr/sbin/\"$t\"; do "+
-                "[ -x \"$q\" ] && { p=\"$q\"; break; }; done; fi; "+
-                "if [ -n \"$p\" ]; then printf '%s: %s\\n' \"$t\" \"$p\"; else printf '%s: 未找到\\n' \"$t\"; fi; done";
+            String command="printf 'UID: '; id; "+ToolCatalog.probeCommand();
             BundledToolchain.InstallResult embedded=new BundledToolchain(this).install();
             Result result=runRoot(command,10000);
             final String output=result.output;
@@ -121,7 +122,8 @@ public final class AircrackToolkitActivity extends Activity {
                 if(result.code!=0 && (output==null||output.trim().isEmpty())){
                     toolStatus.setText("无法完成检测。请确认 Root 管理器已授权本应用。\n退出码："+result.code);
                 }else{
-                    toolStatus.setText("内置工具（"+new BundledToolchain(this).getAbi()+"）："+embedded.message+"\n"+(embedded.installed.isEmpty()?"未释放任何内置命令":"已释放："+android.text.TextUtils.join(", ",embedded.installed))+"\n"+output+(result.code==0?"\n\n检测完成。工具是否存在不代表无线驱动支持全部功能。":"\n\n检测命令退出码："+result.code));
+                    String inventory=ToolCatalog.format(output);
+                    toolStatus.setText("内置工具（"+new BundledToolchain(this).getAbi()+"）："+embedded.message+"\n"+(embedded.installed.isEmpty()?"未释放任何内置命令":"已释放："+android.text.TextUtils.join(", ",embedded.installed))+"\n\n"+inventory+"\n\n提示：工具存在不代表驱动支持 Monitor；本工作台不会自动执行无线注入、断连或口令尝试。"+(result.code==0?"":"\n检测命令退出码："+result.code));
                 }
             });
         });
@@ -135,8 +137,33 @@ public final class AircrackToolkitActivity extends Activity {
         startActivityForResult(i,OPEN_CAPTURE);
     }
 
+    private void exportAnalysisReport() {
+        if(latestAnalysisReport.isEmpty()) return;
+        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_TITLE,"wifitester-capture-analysis.txt");
+        try { startActivityForResult(intent,7402); }
+        catch(Exception e) { Toast.makeText(this,"无法打开文件保存界面："+e.getMessage(),Toast.LENGTH_LONG).show(); }
+    }
+
     @Override protected void onActivityResult(int requestCode,int resultCode,Intent data) {
         super.onActivityResult(requestCode,resultCode,data);
+        if(requestCode==7402&&resultCode==RESULT_OK&&data!=null&&data.getData()!=null) {
+            Uri target=data.getData();
+            String content=latestAnalysisReport;
+            worker.execute(()->{
+                try(OutputStream out=getContentResolver().openOutputStream(target)) {
+                    if(out==null) throw new IllegalStateException("无法打开目标文件");
+                    out.write(content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                    out.flush();
+                    runOnUiThread(()->Toast.makeText(this,"分析报告已导出",Toast.LENGTH_SHORT).show());
+                } catch(Exception e) {
+                    runOnUiThread(()->Toast.makeText(this,"导出失败："+e.getMessage(),Toast.LENGTH_LONG).show());
+                }
+            });
+            return;
+        }
         if(requestCode!=OPEN_CAPTURE||resultCode!=RESULT_OK||data==null||data.getData()==null)return;
         Uri uri=data.getData();
         if(busy){Toast.makeText(this,"已有任务正在运行",Toast.LENGTH_SHORT).show();return;}
@@ -155,20 +182,23 @@ public final class AircrackToolkitActivity extends Activity {
                     byte[] buf=new byte[8192];int n;long total=0;
                     while((n=in.read(buf))!=-1){
                         total+=n;
-                        if(total>200L*1024L*1024L)throw new IllegalArgumentException("文件超过 200 MiB 安全读取上限");
+                        if(total>CaptureFileInspector.MAX_FILE_BYTES)throw new IllegalArgumentException("文件超过 200 MiB 安全读取上限");
                         out.write(buf,0,n);
                     }
                     if(total==0)throw new IllegalArgumentException("文件为空");
                 }
+                CaptureFileInspector.Format format;
+                try(FileInputStream headerInput=new FileInputStream(copy)){format=CaptureFileInspector.detect(headerInput);}
+                if(format==CaptureFileInspector.Format.UNKNOWN)throw new IllegalArgumentException("文件头不是受支持的 PCAP/PCAPNG 格式；未调用分析工具");
                 String path=copy.getAbsolutePath();
-                String quoted="'"+path.replace("'","'\\''")+"'";
+                String quoted=BundledToolchain.quote(path);
                 String cmd="if command -v capinfos >/dev/null 2>&1; then capinfos "+quoted+"; "+
                     "elif [ -x /data/data/com.termux/files/usr/bin/capinfos ]; then /data/data/com.termux/files/usr/bin/capinfos "+quoted+"; "+
                     "elif command -v tshark >/dev/null 2>&1; then tshark -r "+quoted+" -q -z io,phs; "+
                     "elif [ -x /data/data/com.termux/files/usr/bin/tshark ]; then /data/data/com.termux/files/usr/bin/tshark -r "+quoted+" -q -z io,phs; "+
                     "elif command -v tcpdump >/dev/null 2>&1; then tcpdump -nn -r "+quoted+" -c 20 2>&1; else echo '未找到 capinfos、tshark 或 tcpdump。'; exit 127; fi";
                 Result result=runRoot(cmd,20000);
-                output="文件："+uri.getLastPathSegment()+"\n退出码："+result.code+"\n\n"+result.output;
+                output="文件："+uri.getLastPathSegment()+"\n格式："+format.label+"\n退出码："+result.code+"\n\n"+result.output;
                 code=result.code;
             }catch(Exception e){output="读取或分析失败："+e.getClass().getSimpleName()+"："+String.valueOf(e.getMessage());}
             finally{if(copy!=null)try{copy.delete();}catch(Exception ignored){}}
@@ -176,7 +206,9 @@ public final class AircrackToolkitActivity extends Activity {
             runOnUiThread(()->{
                 busy=false;
                 captureButton.setEnabled(true);
-                report.setText(finalOutput+(finalCode==127?"\n\n提示：APK 不会捆绑或自动安装这些命令。":""));
+                latestAnalysisReport=finalOutput+(finalCode==127?"\n\n提示：APK 不会捆绑或自动安装这些命令。":"");
+                report.setText(latestAnalysisReport);
+                exportAnalysisButton.setEnabled(!latestAnalysisReport.isEmpty());
             });
         });
     }

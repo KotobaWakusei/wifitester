@@ -66,6 +66,15 @@ jobs:
           file "$RUNNER_TEMP/apk-check/tcpdump"
           "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "$RUNNER_TEMP/apk-check/tcpdump" | grep -E "Class:|Machine:"
 
+      - name: Verify generated build output is not tracked
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)(build|\\.gradle)/'; then
+            echo 'Generated Gradle/Android outputs must not be committed.' >&2
+            exit 1
+          fi
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:

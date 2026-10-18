@@ -17,6 +17,9 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.util.ArrayList;
@@ -29,14 +32,17 @@ import java.util.regex.Pattern;
 /** Generic passive monitor workflow with capability-based interface and channel discovery. */
 public final class MonitorModeActivity extends Activity {
     private static final int BG=0xff0b1020, PANEL=0xff151f33, ACCENT=0xff78b8ff, MUTED=0xffa8b5ca;
-    private static final int CREATE_REPORT=7021;
+    private static final int CREATE_REPORT=7021, EXPORT_CAPTURE=7022;
     private TextView rootState, capabilityState, log;
     private Spinner ifaceSpinner, channelSpinner;
-    private Button startButton, stopButton, exportButton, refreshButton;
+    private Button startButton, stopButton, exportButton, captureExportButton, refreshButton;
     private final ArrayList<String> interfaces=new ArrayList<>();
     private final ArrayList<WifiChannelParser.Channel> channels=new ArrayList<>();
     private final StringBuilder diagnostics=new StringBuilder();
-    private Process captureProcess;
+    private volatile Process captureProcess;
+    private volatile long capturePid=-1L;
+    private volatile File latestCaptureFile;
+    private File pendingCaptureExport;
     private volatile boolean running=false, createdMonitor=false, rootGranted=false;
     private String activeInterface="", selectedMonitor="wfkmon0";
     private String previousInterfaceState="unknown";
@@ -52,7 +58,7 @@ public final class MonitorModeActivity extends Activity {
         LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(20),dp(22),dp(20),dp(24));scroll.addView(root);
         root.addView(text("无线驱动诊断工具",11,ACCENT,true));
         root.addView(text("监听模式",30,Color.WHITE,true),top(7));
-        root.addView(text("自动发现无线接口与驱动公开的频道。启动前会提示可能造成的 Wi-Fi 中断风险。",14,MUTED,false),top(5));
+        root.addView(text("自动发现无线接口与驱动公开的频道。可将被动抓包保存为 PCAP，单次最多 50,000 帧、每帧最多 512 字节。",14,MUTED,false),top(5));
 
         LinearLayout status=card();
         rootState=text("Root：正在检测…",16,Color.WHITE,true);status.addView(rootState);
@@ -77,6 +83,7 @@ public final class MonitorModeActivity extends Activity {
         root.addView(actions,top(8));stopButton.setEnabled(false);startButton.setEnabled(false);
         startButton.setOnClickListener(v->confirmStart());stopButton.setOnClickListener(v->stopMonitor());
         exportButton=button("导出完整诊断报告",0xff263a56);root.addView(exportButton,top(10));exportButton.setOnClickListener(v->exportReport());
+        captureExportButton=button("导出最近的 PCAP 抓包",0xff315d91);captureExportButton.setEnabled(false);root.addView(captureExportButton,top(8));captureExportButton.setOnClickListener(v->exportCapture());
 
         root.addView(text("诊断日志 / 抓包输出",15,Color.WHITE,true),top(18));
         log=text("等待设备检测…",12,0xffc3d1e5,false);log.setTypeface(Typeface.MONOSPACE);log.setPadding(dp(12),dp(12),dp(12),dp(12));log.setBackground(round(0xff070c16,dp(12)));root.addView(log,top(8));
@@ -247,24 +254,97 @@ public final class MonitorModeActivity extends Activity {
     private void beginCapture(){
         new Thread(()->{
             try{
-                captureProcess=new ProcessBuilder("su","-c",new BundledToolchain(this).shellEnvironment()+"exec tcpdump -i '"+selectedMonitor+"' -n -e -l").redirectErrorStream(true).start();
-                try(BufferedReader reader=new BufferedReader(new InputStreamReader(captureProcess.getInputStream()))){
-                    String line;while((line=reader.readLine())!=null){final String item=line;runOnUiThread(()->append(item));}
+                File directory=new File(getFilesDir(),"captures");
+                if(!directory.isDirectory()&&!directory.mkdirs())throw new java.io.IOException("无法创建应用私有抓包目录");
+                File target=File.createTempFile("wifitester-",".pcap",directory);
+                latestCaptureFile=target;
+                String path=BundledToolchain.quote(target.getAbsolutePath());
+                String iface=BundledToolchain.quote(selectedMonitor);
+                String owner=String.valueOf(android.os.Process.myUid());
+                String shell=new BundledToolchain(this).shellEnvironment()
+                        +"umask 022; tcpdump -i "+iface+" -U -n -s 512 -c 50000 -w "+path
+                        +" & CAPTURE_PID=$!; echo WIFITESTER_CAPTURE_PID:$CAPTURE_PID; wait \"$CAPTURE_PID\"; "
+                        +"RC=$?; chown "+owner+":"+owner+" "+path+" >/dev/null 2>&1 || true; chmod 600 "+path+" >/dev/null 2>&1 || true; exit $RC";
+                Process process=new ProcessBuilder("su","-c",shell).redirectErrorStream(true).start();
+                captureProcess=process;
+                runOnUiThread(()->append("被动 PCAP 捕获已启动：有限采集（最多 50,000 帧，snaplen 512）；文件："+target.getName()));
+                try(BufferedReader reader=new BufferedReader(new InputStreamReader(process.getInputStream()))){
+                    String line;
+                    while((line=reader.readLine())!=null){
+                        if(line.startsWith("WIFITESTER_CAPTURE_PID:")){
+                            try{long parsed=Long.parseLong(line.substring("WIFITESTER_CAPTURE_PID:".length()).trim());if(parsed>1L)capturePid=parsed;}
+                            catch(NumberFormatException ignored){}
+                            final long pid=capturePid;
+                            runOnUiThread(()->append("tcpdump 进程标识："+(pid>1L?String.valueOf(pid):"未能解析")));
+                        }else{
+                            final String item=line;runOnUiThread(()->append(item));
+                        }
+                    }
                 }
-            }catch(Exception e){runOnUiThread(()->append("tcpdump 启动失败："+e.getClass().getSimpleName()+": "+e.getMessage()));}
-        },"wfk-capture-reader").start();
+                int exit=process.waitFor();
+                runOnUiThread(()->append("抓包进程结束，退出码："+exit+"；文件大小："+target.length()+" 字节。"));
+            }catch(Exception e){
+                runOnUiThread(()->append("tcpdump 启动或写入 PCAP 失败："+e.getClass().getSimpleName()+": "+e.getMessage()));
+            }finally{
+                runOnUiThread(()->{
+                    if(captureExportButton!=null)captureExportButton.setEnabled(!running&&isUsableCapture(latestCaptureFile));
+                });
+            }
+        },"wifitester-pcap-capture").start();
+    }
+
+    private boolean isUsableCapture(File file){
+        return file!=null&&file.isFile()&&file.length()>=24L;
+    }
+
+    private void exportCapture(){
+        File source=latestCaptureFile;
+        if(running){toast("请先停止监听，等待 PCAP 文件关闭后再导出");return;}
+        if(!isUsableCapture(source)){toast("尚无有效抓包文件；请先启动并停止一次监听");return;}
+        pendingCaptureExport=source;
+        Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);
+        intent.addCategory(Intent.CATEGORY_OPENABLE);
+        intent.setType("application/vnd.tcpdump.pcap");
+        intent.putExtra(Intent.EXTRA_TITLE,source.getName());
+        try{startActivityForResult(intent,EXPORT_CAPTURE);}
+        catch(Exception e){toast("无法打开文件保存界面："+e.getMessage());}
     }
 
     private void stopMonitor(){
         if(!running&&!createdMonitor)return;
         stopButton.setEnabled(false);append("===== 停止监听并恢复接口 =====");
         new Thread(()->{
-            Process p=captureProcess;if(p!=null){p.destroy();captureProcess=null;}
+            long pid=capturePid;
+            long pidDeadline=System.currentTimeMillis()+1200L;
+            while(pid<=1L&&System.currentTimeMillis()<pidDeadline){
+                try{Thread.sleep(40L);}catch(InterruptedException e){Thread.currentThread().interrupt();break;}
+                pid=capturePid;
+            }
+            if(pid>1L){
+                Result signal=runRoot("kill -INT "+pid+" 2>/dev/null || true; echo CAPTURE_INTERRUPT_SENT",2500);
+                append("已请求 tcpdump 完成写入并关闭 PCAP：\n"+trim(signal.output,600));
+            }
+            Process p=captureProcess;
+            if(p!=null){
+                long deadline=System.currentTimeMillis()+2200L;
+                boolean finished=false;
+                while(System.currentTimeMillis()<deadline){
+                    try{p.exitValue();finished=true;break;}
+                    catch(IllegalThreadStateException e){try{Thread.sleep(40L);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();break;}}
+                }
+                if(!finished){
+                    p.destroy();
+                    append("警告：抓包进程未及时退出，已终止等待；请检查导出的文件是否完整。");
+                }
+            }
+            captureProcess=null;capturePid=-1L;
             String restore=("up".equals(previousInterfaceState)?"up":"down");
             Result r=runRoot("ip link set '"+selectedMonitor+"' down >/dev/null 2>&1 || true; iw dev '"+selectedMonitor+"' del >/dev/null 2>&1 || true; ip link set '"+activeInterface+"' "+restore+" >/dev/null 2>&1 || true; echo RESTORE_ATTEMPTED",8000);
+            boolean canExport=isUsableCapture(latestCaptureFile);
             runOnUiThread(()->{
                 running=false;createdMonitor=false;stopButton.setEnabled(false);startButton.setEnabled(rootGranted&&!channels.isEmpty()&&!interfaces.isEmpty());refreshButton.setEnabled(true);
-                capabilityState.setText("已停止；已尝试恢复接口原始状态（"+restore+"）。请确认系统 Wi-Fi 已恢复。");
+                captureExportButton.setEnabled(canExport);
+                capabilityState.setText("已停止；已尝试恢复接口原始状态（"+restore+"）。"+(canExport?" PCAP 已保存，可导出分析。":" 未生成有效 PCAP。")+"请确认系统 Wi-Fi 已恢复。");
                 append("恢复尝试：\n"+trim(r.output,1200));
             });
         }).start();
@@ -272,7 +352,7 @@ public final class MonitorModeActivity extends Activity {
 
     private void exportReport(){
         StringBuilder report=new StringBuilder();
-        report.append("WiFiKill 监听模式 diagnostics\n生成时间：").append(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z",Locale.US).format(new java.util.Date())).append("\n");
+        report.append("WiFiTester 监听模式诊断\n生成时间：").append(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z",Locale.US).format(new java.util.Date())).append("\n");
         report.append("应用版本：").append(getPackageName()).append("\nAndroid 版本：").append(android.os.Build.VERSION.RELEASE).append(" (SDK ").append(android.os.Build.VERSION.SDK_INT).append(")\n");
         report.append("设备：").append(android.os.Build.MANUFACTURER).append(" ").append(android.os.Build.MODEL).append("\nRoot currently granted: ").append(rootGranted).append("\n");
         report.append("选定接口：").append(ifaceSpinner.getSelectedItem()==null?"-":ifaceSpinner.getSelectedItem()).append("\n");
@@ -291,6 +371,24 @@ public final class MonitorModeActivity extends Activity {
                 if(stream==null)throw new java.io.IOException("无法打开目标文件");
                 stream.write(pendingReport.getBytes(java.nio.charset.StandardCharsets.UTF_8));stream.flush();toast("诊断报告已导出");
             }catch(Exception e){append("报告导出失败："+e.getMessage());toast("导出失败："+e.getMessage());}
+            return;
+        }
+        if(requestCode==EXPORT_CAPTURE&&resultCode==RESULT_OK&&data!=null&&data.getData()!=null){
+            File source=pendingCaptureExport;
+            Uri target=data.getData();
+            if(!isUsableCapture(source)){toast("抓包文件已不存在或不完整");return;}
+            new Thread(()->{
+                try(InputStream in=new FileInputStream(source);
+                    OutputStream out=getContentResolver().openOutputStream(target)){
+                    if(out==null)throw new java.io.IOException("无法打开目标文件");
+                    byte[] buffer=new byte[16384];int n;
+                    while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
+                    out.flush();
+                    runOnUiThread(()->toast("PCAP 已导出："+source.length()+" 字节"));
+                }catch(Exception e){
+                    runOnUiThread(()->{append("PCAP 导出失败："+e.getMessage());toast("PCAP 导出失败："+e.getMessage());});
+                }
+            },"wifitester-pcap-export").start();
         }
     }
 

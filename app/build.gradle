@@ -14,8 +14,8 @@ android {
         applicationId 'me.paranoid.wifikill'
         minSdk 21
         targetSdk 34
-        versionCode 2020
-        versionName '2.2-mod'
+        versionCode 2021
+        versionName '2.3.0'
     }
 
     buildTypes {

@@ -43,7 +43,7 @@ tar -xf "$WORK/tcpdump.tar.xz" -C "$WORK"
 cd "$WORK/tcpdump-4.99.5"
 CC="$CC" AR="$AR" RANLIB="$RANLIB" CFLAGS="-O2 -fPIC" \
   LDFLAGS="-static" LIBS="$PREFIX/lib/libpcap.a" ./configure \
-  --host=aarch64-linux-android --prefix="$PREFIX" --disable-shared --enable-static
+  --host=aarch64-linux-android --prefix="$PREFIX" --with-crypto=no
 make -j2
 install -m 0755 tcpdump "$ASSETS/tcpdump"
 "$STRIP" "$ASSETS/tcpdump"

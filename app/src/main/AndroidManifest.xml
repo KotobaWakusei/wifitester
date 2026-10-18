@@ -58,6 +58,12 @@
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
         <activity
+            android:name="me.paranoid.wifikill.FrameAnalysisActivity"
+            android:exported="false"
+            android:label="断开帧分析"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <activity
             android:name="me.paranoid.wifikill.WiFiAuditActivity"
             android:exported="false"
             android:label="Wi-Fi 网络信息"

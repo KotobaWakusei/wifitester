@@ -226,7 +226,7 @@ public final class MonitorModeActivity extends Activity {
                     new Thread(()->{
                         Result cleanupResult=runRoot(cleanup,6000);
                         runOnUiThread(()->{
-                            append("===== 清理与恢复 =====\\n退出码："+cleanupResult.code+"\\n"+trim(cleanupResult.output,1200));
+                            append("===== 清理与恢复 =====\n退出码："+cleanupResult.code+"\n"+trim(cleanupResult.output,1200));
                             capabilityState.setText(failureMessage);
                             startButton.setEnabled(rootGranted&&!channels.isEmpty()&&!interfaces.isEmpty());
                             refreshButton.setEnabled(true);

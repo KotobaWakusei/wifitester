@@ -50,20 +50,20 @@ public final class MonitorModeActivity extends Activity {
     private void buildUi(){
         ScrollView scroll=new ScrollView(this);scroll.setBackgroundColor(BG);
         LinearLayout root=new LinearLayout(this);root.setOrientation(1);root.setPadding(dp(20),dp(22),dp(20),dp(24));scroll.addView(root);
-        root.addView(text("WIRELESS DRIVER TOOLKIT",11,ACCENT,true));
-        root.addView(text("Monitor Mode",30,Color.WHITE,true),top(7));
-        root.addView(text("自动发现可用接口和驱动公开的频道列表。启动前会显示可能的 Wi-Fi 中断风险。",14,MUTED,false),top(5));
+        root.addView(text("无线驱动诊断工具",11,ACCENT,true));
+        root.addView(text("监听模式",30,Color.WHITE,true),top(7));
+        root.addView(text("自动发现无线接口与驱动公开的频道。启动前会提示可能造成的 Wi-Fi 中断风险。",14,MUTED,false),top(5));
 
         LinearLayout status=card();
-        rootState=text("Root：检测中…",16,Color.WHITE,true);status.addView(rootState);
+        rootState=text("Root：正在检测…",16,Color.WHITE,true);status.addView(rootState);
         capabilityState=text("无线能力：等待检测",13,MUTED,false);status.addView(capabilityState,top(7));
         refreshButton=button("重新检测设备",0xff2c3d58);status.addView(refreshButton,top(12));refreshButton.setOnClickListener(v->probe());
         root.addView(status,top(17));
 
         LinearLayout controls=card();
-        controls.addView(text("无线接口（自动选择首个可用接口）",14,Color.WHITE,true));
+        controls.addView(text("无线接口（按适用性排序）",14,Color.WHITE,true));
         ifaceSpinner=new Spinner(this);controls.addView(ifaceSpinner,top(4));
-        controls.addView(text("驱动支持的监听频道（HT20）",14,Color.WHITE,true),top(12));
+        controls.addView(text("驱动声明支持的频道（HT20）",14,Color.WHITE,true),top(12));
         channelSpinner=new Spinner(this);controls.addView(channelSpinner,top(4));
         root.addView(controls,top(12));
 
@@ -78,7 +78,7 @@ public final class MonitorModeActivity extends Activity {
         startButton.setOnClickListener(v->confirmStart());stopButton.setOnClickListener(v->stopMonitor());
         exportButton=button("导出完整诊断报告",0xff263a56);root.addView(exportButton,top(10));exportButton.setOnClickListener(v->exportReport());
 
-        root.addView(text("诊断 / 实时抓包输出",15,Color.WHITE,true),top(18));
+        root.addView(text("诊断日志 / 抓包输出",15,Color.WHITE,true),top(18));
         log=text("等待设备检测…",12,0xffc3d1e5,false);log.setTypeface(Typeface.MONOSPACE);log.setPadding(dp(12),dp(12),dp(12),dp(12));log.setBackground(round(0xff070c16,dp(12)));root.addView(log,top(8));
         setContentView(scroll);
     }
@@ -106,7 +106,7 @@ public final class MonitorModeActivity extends Activity {
                 boolean ok=rootOk&&iw&&tcpdump&&ip&&!interfaces.isEmpty()&&!channels.isEmpty();
                 capabilityState.setText("工具："+(iw?"iw ✓":"iw ×")+"  "+(ip?"ip ✓":"ip ×")+"  "+(tcpdump?"tcpdump ✓":"tcpdump ×")+
                         "\n无线接口："+interfaces.size()+"  ·  驱动公开频道："+channels.size()+
-                        "\n频道列表来自 iw list；实际能否启动仍由驱动运行时决定。");
+                        "\n频道列表来自 iw list；能否创建接口及调谐频道仍取决于驱动的实际运行结果。");
                 startButton.setEnabled(ok);
                 append("===== 设备检测 =====\n退出码："+r.code+"\nRoot："+rootOk+" / iw："+iw+" / ip："+ip+" / tcpdump："+tcpdump+
                         "\n接口："+interfaces+"\n频道："+labels+"\n\n"+trim(out,6500));
@@ -153,7 +153,7 @@ public final class MonitorModeActivity extends Activity {
     private void confirmStart(){
         if(!rootGranted||ifaceSpinner.getSelectedItem()==null||channelSpinner.getSelectedItemPosition()<0||channels.isEmpty())return;
         new AlertDialog.Builder(this).setTitle("开始被动监听")
-                .setMessage("将使用 "+ifaceSpinner.getSelectedItem()+"，频道 "+channels.get(channelSpinner.getSelectedItemPosition()).label+
+                .setMessage("即将使用 "+ifaceSpinner.getSelectedItem()+"，频道 "+channels.get(channelSpinner.getSelectedItemPosition()).label+
                         "。系统可能需要关闭原接口，导致当前 Wi-Fi 连接暂时中断。是否继续？")
                 .setNegativeButton("取消",null).setPositiveButton("开始",(d,w)->startMonitor()).show();
     }
@@ -161,7 +161,7 @@ public final class MonitorModeActivity extends Activity {
     private void startMonitor(){
         if(running||ifaceSpinner.getSelectedItem()==null)return;
         activeInterface=ifaceSpinner.getSelectedItem().toString();
-        if(!activeInterface.matches("[A-Za-z0-9_.-]+")){append("拒绝执行：无线接口名称格式不安全。");return;}
+        if(!activeInterface.matches("[A-Za-z0-9_.-]+")){append("已取消操作：无线接口名称格式不安全。");return;}
         WifiChannelParser.Channel channel=channels.get(channelSpinner.getSelectedItemPosition());
         startButton.setEnabled(false);refreshButton.setEnabled(false);append("===== 启动监听 =====\n接口："+activeInterface+"，频道："+channel.label);
         new Thread(()->{
@@ -169,7 +169,7 @@ public final class MonitorModeActivity extends Activity {
             String old=pre.output==null?"":pre.output;
             if(pre.code!=0){
                 runOnUiThread(()->{
-                    append("无法可靠读取接口原始状态，已取消启动以避免错误修改网络状态。\n"+trim(old,1200));
+                    append("无法可靠读取接口原始状态，已取消启动，未修改网络状态。\n"+trim(old,1200));
                     capabilityState.setText("无法读取接口状态；未更改网络接口。");
                     startButton.setEnabled(rootGranted&&!channels.isEmpty()&&!interfaces.isEmpty());
                     refreshButton.setEnabled(true);
@@ -179,7 +179,7 @@ public final class MonitorModeActivity extends Activity {
             String state=InterfaceStateParser.parseAdministrativeState(old);
             if(state==null){
                 runOnUiThread(()->{
-                    append("无法解析接口状态，已取消启动。\n"+trim(old,1200));
+                    append("无法解析接口状态，已取消启动，未修改网络状态。\n"+trim(old,1200));
                     capabilityState.setText("接口状态格式未知；未更改网络接口。");
                     startButton.setEnabled(rootGranted&&!channels.isEmpty()&&!interfaces.isEmpty());
                     refreshButton.setEnabled(true);
@@ -191,7 +191,7 @@ public final class MonitorModeActivity extends Activity {
                     "if iw dev \"$MON\" info >/dev/null 2>&1; then echo 'ERROR: monitor interface already exists'; exit 7; fi; "+
                     "ip link set \"$IF\" down; "+
                     "if ! iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then "+
-                    "iw dev \"$IF\" interface add \"$MON\" type monitor; fi; echo MONITOR_CREATED; "+
+                    "iw dev \"$IF\" interface add \"$MON\" type monitor; fi; echo 监听接口创建成功标记; "+
                     "iw dev \"$MON\" set freq "+channel.frequency+" HT20; ip link set \"$MON\" up; echo MONITOR_READY";
             Result r=runRoot(cmd,12000);
             final String oldState=state;
@@ -202,7 +202,7 @@ public final class MonitorModeActivity extends Activity {
                     // Only delete an interface this invocation actually created.
                     // An existing wfkmon0 must never be removed on the preflight-error path.
                     String cleanup="";
-                    if(r.output!=null && r.output.contains("MONITOR_CREATED")){
+                    if(r.output!=null && r.output.contains("监听接口创建成功标记")){
                         cleanup+="iw dev '"+selectedMonitor+"' del >/dev/null 2>&1 || true; ";
                     }
                     cleanup+="ip link set '"+activeInterface+"' "+("up".equals(oldState)?"up":"down")+" >/dev/null 2>&1 || true";
@@ -247,11 +247,11 @@ public final class MonitorModeActivity extends Activity {
 
     private void exportReport(){
         StringBuilder report=new StringBuilder();
-        report.append("WiFiKill Monitor Mode diagnostics\nGenerated: ").append(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z",Locale.US).format(new java.util.Date())).append("\n");
-        report.append("App version: ").append(getPackageName()).append("\nAndroid: ").append(android.os.Build.VERSION.RELEASE).append(" (SDK ").append(android.os.Build.VERSION.SDK_INT).append(")\n");
-        report.append("Device: ").append(android.os.Build.MANUFACTURER).append(" ").append(android.os.Build.MODEL).append("\nRoot currently granted: ").append(rootGranted).append("\n");
-        report.append("Selected interface: ").append(ifaceSpinner.getSelectedItem()==null?"-":ifaceSpinner.getSelectedItem()).append("\n");
-        report.append("Selected channel: ").append(channelSpinner.getSelectedItem()==null?"-":channelSpinner.getSelectedItem()).append("\nMonitor running: ").append(running).append("\n\n");
+        report.append("WiFiKill 监听模式 diagnostics\n生成时间：").append(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z",Locale.US).format(new java.util.Date())).append("\n");
+        report.append("应用版本：").append(getPackageName()).append("\nAndroid 版本：").append(android.os.Build.VERSION.RELEASE).append(" (SDK ").append(android.os.Build.VERSION.SDK_INT).append(")\n");
+        report.append("设备：").append(android.os.Build.MANUFACTURER).append(" ").append(android.os.Build.MODEL).append("\nRoot currently granted: ").append(rootGranted).append("\n");
+        report.append("选定接口：").append(ifaceSpinner.getSelectedItem()==null?"-":ifaceSpinner.getSelectedItem()).append("\n");
+        report.append("选定频道：").append(channelSpinner.getSelectedItem()==null?"-":channelSpinner.getSelectedItem()).append("\nMonitor running: ").append(running).append("\n\n");
         synchronized(diagnostics){report.append(diagnostics);}
         Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("text/plain");intent.putExtra(Intent.EXTRA_TITLE,"wifikill-diagnostics-"+System.currentTimeMillis()+".txt");
         pendingReport=report.toString();
@@ -300,9 +300,9 @@ public final class MonitorModeActivity extends Activity {
     private void runRootAsync(String cmd){new Thread(()->runRoot(cmd,8000)).start();}
     private String trim(String s,int max){if(s==null)return "";return s.length()<=max?s:"…（较早输出已截断）…\n"+s.substring(s.length()-max);}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
-    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(16),dp(16),dp(16),dp(16));l.setBackground(round(PANEL,dp(16)));return l;}
+    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(17),dp(17),dp(17),dp(17));GradientDrawable bg=round(PANEL,dp(17));bg.setStroke(dp(1),0xff26344c);l.setBackground(bg);l.setElevation(dp(2));return l;}
     private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
-    private Button button(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setBackground(round(color,dp(12)));return b;}
+    private Button button(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setMinHeight(dp(48));b.setBackground(round(color,dp(14)));if(android.os.Build.VERSION.SDK_INT>=21)b.setElevation(dp(1));return b;}
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(radius);return d;}
     private LinearLayout.LayoutParams top(int v){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(v);return p;}
     private int dp(float v){return (int)(v*getResources().getDisplayMetrics().density+0.5f);}

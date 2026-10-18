@@ -115,6 +115,44 @@ public final class DashboardActivity extends Activity {
         if(tab==0) buildWifiTab();
         else if(tab==1) buildToolsTab();
         else buildSettingsTab();
+        animatePageIn();
+        animateSelectedNavigation();
+    }
+
+    /** Lightweight native-property transitions; no extra animation dependency. */
+    private void animatePageIn() {
+        if(content==null||content.getChildCount()==0)return;
+        View page=content.getChildAt(0);
+        page.setAlpha(0f);
+        page.setTranslationY(dp(8));
+        page.animate().alpha(1f).translationY(0f).setDuration(220)
+                .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+        if(page instanceof ScrollView) {
+            View child=((ScrollView)page).getChildAt(0);
+            if(child instanceof LinearLayout) {
+                LinearLayout root=(LinearLayout)child;
+                for(int i=0;i<root.getChildCount();i++) {
+                    View item=root.getChildAt(i);
+                    item.setAlpha(0f);
+                    item.setTranslationY(dp(10));
+                    item.animate().alpha(1f).translationY(0f)
+                            .setStartDelay(Math.min(i*35,210)).setDuration(240)
+                            .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+                }
+            }
+        }
+    }
+
+    private void animateSelectedNavigation() {
+        if(navigation==null)return;
+        for(int i=0;i<navigation.getChildCount();i++) {
+            View item=navigation.getChildAt(i);
+            if(item.getTag() instanceof Integer && ((Integer)item.getTag())==selectedTab) {
+                item.setScaleX(0.96f); item.setScaleY(0.96f);
+                item.animate().scaleX(1f).scaleY(1f).setDuration(180)
+                        .setInterpolator(new android.view.animation.OvershootInterpolator(1.2f)).start();
+            }
+        }
     }
 
     private ScrollView page(String eyebrow,String title,String subtitle) {
@@ -366,7 +404,12 @@ public final class DashboardActivity extends Activity {
             connect.setOnClickListener(v->openWifiPanel());
             item.addView(connect);
             item.setOnClickListener(v->showNetworkDetails(result));
+            item.setAlpha(0f);
+            item.setTranslationY(dp(6));
             networkList.addView(item);
+            item.animate().alpha(1f).translationY(0f)
+                    .setStartDelay(Math.min(networkList.getChildCount()*24,180)).setDuration(180)
+                    .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
             View line=new View(this);line.setBackgroundColor(LINE);networkList.addView(line,new LinearLayout.LayoutParams(-1,dp(1)));
         }
     }
@@ -424,7 +467,22 @@ public final class DashboardActivity extends Activity {
     private String ipToString(int ip){if(ip==0)return "未知";return (ip&255)+"."+((ip>>8)&255)+"."+((ip>>16)&255)+"."+((ip>>24)&255);}
     private LinearLayout card(){LinearLayout c=new LinearLayout(this);c.setOrientation(LinearLayout.VERTICAL);c.setPadding(dp(15),dp(15),dp(15),dp(15));c.setBackground(round(PANEL,dp(17)));return c;}
     private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,bold?Typeface.BOLD:Typeface.NORMAL);return t;}
-    private Button button(String s,int bg,int fg){Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(13);b.setTextColor(fg);b.setMinHeight(dp(42));b.setPadding(dp(12),0,dp(12),0);b.setBackground(round(bg,dp(12)));return b;}
+    private Button button(String s,int bg,int fg){
+        Button b=new Button(this);b.setText(s);b.setAllCaps(false);b.setTextSize(13);
+        b.setTextColor(fg);b.setMinHeight(dp(42));b.setPadding(dp(12),0,dp(12),0);
+        b.setBackground(round(bg,dp(12)));
+        b.setOnTouchListener((view,event)->{
+            if(event.getAction()==android.view.MotionEvent.ACTION_DOWN) {
+                view.animate().scaleX(0.985f).scaleY(0.985f).setDuration(75).start();
+            } else if(event.getAction()==android.view.MotionEvent.ACTION_UP
+                    ||event.getAction()==android.view.MotionEvent.ACTION_CANCEL) {
+                view.animate().scaleX(1f).scaleY(1f).setDuration(120)
+                        .setInterpolator(new android.view.animation.DecelerateInterpolator()).start();
+            }
+            return false;
+        });
+        return b;
+    }
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(radius);return d;}
     private LinearLayout.LayoutParams top(int n){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(n);return p;}
     private LinearLayout.LayoutParams bottom(int n){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(n);return p;}

@@ -87,6 +87,7 @@ public final class MonitorModeActivity extends Activity {
         if(running){toast("请先停止监听，再重新检测");return;}
         startButton.setEnabled(false);rootState.setText("Root：正在验证授权…");capabilityState.setText("无线能力：正在枚举接口、频道和工具…");
         new Thread(()->{
+            BundledToolchain.InstallResult embedded=new BundledToolchain(this).install();
             Result r=runRoot("id; echo __IW_PATH__; command -v iw; echo __TCPDUMP_PATH__; command -v tcpdump; echo __IP_PATH__; command -v ip; echo __IW_LIST__; iw list 2>&1; echo __IW_DEV__; iw dev 2>&1; echo __LINKS__; ip -o link show 2>&1",15000);
             String out=r.output==null?"":r.output;
             boolean rootOk=r.code==0 && Pattern.compile("\\buid=0(?:\\(|\\b)").matcher(out).find();
@@ -108,7 +109,7 @@ public final class MonitorModeActivity extends Activity {
                         "\n无线接口："+interfaces.size()+"  ·  驱动公开频道："+channels.size()+
                         "\n频道列表来自 iw list；能否创建接口及调谐频道仍取决于驱动的实际运行结果。");
                 startButton.setEnabled(ok);
-                append("===== 设备检测 =====\n退出码："+r.code+"\nRoot："+rootOk+" / iw："+iw+" / ip："+ip+" / tcpdump："+tcpdump+
+                append("===== 设备检测 =====\n内置工具（"+new BundledToolchain(this).getAbi()+"）："+embedded.message+"；已释放："+embedded.installed+"\n退出码："+r.code+"\nRoot："+rootOk+" / iw："+iw+" / ip："+ip+" / tcpdump："+tcpdump+
                         "\n接口："+interfaces+"\n频道："+labels+"\n\n"+trim(out,6500));
             });
         }).start();
@@ -299,7 +300,7 @@ public final class MonitorModeActivity extends Activity {
     private Result runRoot(String command,int timeout){
         Process p=null;StringBuilder out=new StringBuilder();int code=-1;
         try{
-            p=new ProcessBuilder("su","-c",command).redirectErrorStream(true).start();
+            p=new ProcessBuilder("su","-c",new BundledToolchain(this).shellEnvironment()+command).redirectErrorStream(true).start();
             final Process process=p;
             Thread reader=new Thread(()->{try(BufferedReader br=new BufferedReader(new InputStreamReader(process.getInputStream()))){String line;while((line=br.readLine())!=null)synchronized(out){out.append(line).append('\n');}}catch(Exception ignored){}});
             reader.start();long deadline=System.currentTimeMillis()+timeout;boolean finished=false;

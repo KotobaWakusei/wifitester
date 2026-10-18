@@ -26,7 +26,7 @@ WiFiTester 是面向已取得 Root 权限的 Android 设备的 **被动 Wi-Fi �
 gradle --no-daemon assembleDebug
 ```
 
-APK 输出路径为 `app/build/outputs/apk/debug/app-debug.apk`。GitHub Actions 会在推送和 Pull Request 事件中构建调试版 APK；请在对应工作流运行记录中下载 `wifikill-debug-apk` 构建产物。
+APK 输出路径为 `app/build/outputs/apk/debug/app-debug.apk`。GitHub Actions 会在推送、Pull Request 和手动触发时运行单元测试并构建调试版 APK；请在对应工作流运行记录中下载 `wifitester-debug-apk` 构建产物。
 
 ## 使用监听模式
 

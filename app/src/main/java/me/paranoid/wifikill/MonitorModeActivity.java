@@ -329,7 +329,7 @@ public final class MonitorModeActivity extends Activity {
             }
             captureProcess=null;capturePid=-1L;
             String restore=("up".equals(previousInterfaceState)?"up":"down");
-            Result r=runRoot(monitorBackend.buildStopCommand(activeInterface,selectedMonitor,previousInterfaceState),8000); iw dev '"+selectedMonitor+"' del >/dev/null 2>&1 || true; ip link set '"+activeInterface+"' "+restore+" >/dev/null 2>&1 || true; echo RESTORE_ATTEMPTED",8000);
+            Result r=runRoot(monitorBackend.buildStopCommand(activeInterface,selectedMonitor,previousInterfaceState),8000);
             boolean canExport=isUsableCapture(latestCaptureFile);
             runOnUiThread(()->{
                 running=false;createdMonitor=false;stopButton.setEnabled(false);startButton.setEnabled(rootGranted&&!channels.isEmpty()&&!interfaces.isEmpty());refreshButton.setEnabled(true);

@@ -38,7 +38,6 @@ jobs:
             https://dl.google.com/android/repository/android-ndk-r27c-linux.zip \
             --output "$NDK_ZIP"
           unzip -q "$NDK_ZIP" -d "$RUNNER_TEMP"
-          mv "$RUNNER_TEMP/android-ndk-r27c" "$NDK_DIR"
           echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
           echo "NDK_VERSION=27.2.12479018" >> "$GITHUB_ENV"
           "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android23-clang" --version

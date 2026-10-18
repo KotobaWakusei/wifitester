@@ -4,9 +4,11 @@ set -euo pipefail
 # Build a small, self-contained Android ARM64 tcpdump using the official NDK.
 # The binary is packaged as an APK asset and extracted by BundledToolchain.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-: "${ANDROID_HOME:?`ANDROID_HOME` must point to the Android SDK}"
 NDK_VERSION="${NDK_VERSION:-27.2.12479018}"
-NDK="${ANDROID_HOME}/ndk/${NDK_VERSION}"
+NDK="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-${ANDROID_HOME:-}/ndk/${NDK_VERSION}}"
+if [[ ! -d "$NDK" && -n "${ANDROID_HOME:-}" ]]; then
+  NDK="${ANDROID_HOME}/ndk/${NDK_VERSION}"
+fi
 if [[ ! -d "$NDK" ]]; then
   echo "Android NDK not found at $NDK" >&2
   exit 2

@@ -115,7 +115,7 @@ public final class DashboardActivity extends Activity {
                 if(!finished){
                     p.destroy();
                     try{reader.join(1000L);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();}
-                    out="Root check timed out after 15 seconds. Check whether the root manager is waiting for authorization.";
+                    out="Root 权限检测超时（15 秒）。请检查 Root 管理器是否正在等待授权。";
                     code=-1;
                 }else{
                     reader.join(1500L);
@@ -137,7 +137,7 @@ public final class DashboardActivity extends Activity {
     // trigger root-manager authorization prompts when access has been denied.
     @Override protected void onResume(){super.onResume();refreshRoot();}
     @Override protected void onDestroy(){worker.shutdownNow();super.onDestroy();}
-    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(17),dp(17),dp(17),dp(17));l.setBackground(round(PANEL,dp(18)));return l;}
+    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(18),dp(18),dp(18),dp(18));GradientDrawable bg=round(PANEL,dp(18));bg.setStroke(dp(1),0xff26344c);l.setBackground(bg);l.setElevation(dp(2));return l;}
     private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(radius);return d;}
     private LinearLayout.LayoutParams bottom(){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(12);return p;}

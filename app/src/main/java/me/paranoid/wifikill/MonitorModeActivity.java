@@ -132,7 +132,8 @@ public final class MonitorModeActivity extends Activity {
             Matcher ip=Pattern.compile("(?m)^\\d+:\\s*([A-Za-z0-9_.-]+):").matcher(out);
             while(ip.find()){
                 String n=ip.group(1);
-                if((n.startsWith("wlan")||n.startsWith("wifi")||n.startsWith("wl")||n.startsWith("ath"))&&!n.startsWith("wfkmon")&&!found.contains(n))found.add(n);
+                String lower=n.toLowerCase(Locale.US);
+                if(!lower.contains("aware")&&!lower.startsWith("p2p")&&(n.startsWith("wlan")||n.startsWith("wifi")||n.startsWith("wl")||n.startsWith("ath"))&&!n.startsWith("wfkmon")&&!found.contains(n))found.add(n);
             }
         }
         java.util.Collections.sort(found,(a,b)->Integer.compare(interfacePriority(a),interfacePriority(b)));

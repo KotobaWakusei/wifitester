@@ -93,7 +93,7 @@ public final class AircrackToolkitActivity extends Activity {
         audit.addView(auditButton,top(12));
         root.addView(audit,bottom(12));
 
-        TextView note=text("安全边界：本工作台不提供断开他人连接、无线注入或口令破解按钮。请仅分析自己拥有或获得明确授权的网络与抓包文件。",12,MUTED,false);
+        TextView note=text("⚠ 使用免责声明与授权要求\\n本工具仅供合法的无线网络诊断、课程实验和经授权的安全测试。使用者必须拥有目标网络/设备，或事先取得网络所有者明确、可验证的书面授权，并遵守所在地法律、无线电监管要求及组织政策。监听、切换频道或关闭接口可能中断本机连接，并可能捕获第三方通信元数据；请优先使用隔离实验网络，尽量减少采集并妥善保护日志与抓包文件。开发者不对误用、数据丢失、服务中断或由使用者行为导致的损害承担责任。免责声明不构成任何法律许可，也不能替代真实授权。本工作台当前不提供无线注入、强制断开客户端或口令破解功能。",12,MUTED,false);
         note.setPadding(dp(4),dp(8),dp(4),0);
         root.addView(note);
         setContentView(scroll);

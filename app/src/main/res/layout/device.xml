@@ -57,7 +57,7 @@
             android:id="@+id/nbname"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="NetBIOS Name"/>
+            android:text="网络名称（NetBIOS）"/>
         <LinearLayout
             android:id="@+id/net_usage"
             android:layout_width="wrap_content"

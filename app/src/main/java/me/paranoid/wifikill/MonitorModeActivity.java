@@ -222,9 +222,10 @@ public final class MonitorModeActivity extends Activity {
                     else if(r.output!=null && r.output.contains("CHANNEL_SET_FAILED")) failure="监听接口已创建，但驱动拒绝切换到所选频道；正在清理接口并恢复原状态。";
                     else if(r.output!=null && r.output.contains("MONITOR_UP_FAILED")) failure="监听接口已创建，但无法启用该接口；正在清理接口并恢复原状态。";
                     final String failureMessage=failure;
+                    final String cleanupCommand=cleanup;
                     startButton.setEnabled(false);refreshButton.setEnabled(false);
                     new Thread(()->{
-                        Result cleanupResult=runRoot(cleanup,6000);
+                        Result cleanupResult=runRoot(cleanupCommand,6000);
                         runOnUiThread(()->{
                             append("===== 清理与恢复 =====\n退出码："+cleanupResult.code+"\n"+trim(cleanupResult.output,1200));
                             capabilityState.setText(failureMessage);

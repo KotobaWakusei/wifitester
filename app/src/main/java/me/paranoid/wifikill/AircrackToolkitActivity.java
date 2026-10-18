@@ -53,7 +53,7 @@ public final class AircrackToolkitActivity extends Activity {
 
         root.addView(text("WIFITESTER  /  工具链集成",11,ACCENT,true));
         root.addView(text("Aircrack-ng 工作台",28,Color.WHITE,true),top(9));
-        root.addView(text("工具环境检测、被动监听入口与抓包文件只读分析。Aircrack-ng 本身不会随 APK 自动安装。",14,MUTED,false),top(8));
+        root.addView(text("内置工具自动释放、Root 环境检测、被动监听入口与抓包文件只读分析。当前内置工具集以构建产物中实际打包的文件为准。",14,MUTED,false),top(8));
 
         LinearLayout status=card();
         status.addView(text("工具链状态",17,Color.WHITE,true));

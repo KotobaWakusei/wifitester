@@ -92,6 +92,11 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                 "echo RESTORE_ATTEMPTED";
     }
 
+    private static String quoteInterface(String validatedInterface) {
+        // Called only after validateInterface; the accepted alphabet has no shell metacharacters.
+        return "'" + validatedInterface + "'";
+    }
+
     private static String validateInterface(String value) {
         if (value == null || !value.matches("[A-Za-z0-9_.-]{1,15}")) {
             throw new IllegalArgumentException("无线接口名格式无效");

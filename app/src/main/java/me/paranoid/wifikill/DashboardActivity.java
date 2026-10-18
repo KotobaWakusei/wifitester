@@ -44,7 +44,8 @@ public final class DashboardActivity extends Activity {
     private TextView wifiState, connectedName, connectedDetails, rootWarning, scanSummary;
     private LinearLayout networkList;
     private int selectedTab=0;
-    private volatile boolean rootCheckRunning=false;\n    private Boolean rootAvailable=null;
+    private volatile boolean rootCheckRunning=false;
+    private Boolean rootAvailable=null;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -386,8 +387,8 @@ public final class DashboardActivity extends Activity {
     }
 
     private void checkRootWarning() {
-        if(rootCheckStarted)return;
-        rootCheckStarted=true;
+        if(rootCheckRunning)return;
+        rootCheckRunning=true;
         new Thread(()->{
             boolean granted=false;
             Process p=null;
@@ -401,9 +402,9 @@ public final class DashboardActivity extends Activity {
             finally{if(p!=null&&p.isAlive())p.destroy();}
             final boolean hasRoot=granted;
             runOnUiThread(()->{
-                if(rootWarning==null)return;
-                rootWarning.setVisibility(hasRoot?View.GONE:View.VISIBLE);
-                rootWarning.setText("⚠ 未获得 Root 权限。普通 Wi-Fi 信息仍可查看；监听模式、底层接口操作和部分抓包功能需要在 Root 管理器中授权。");
+                rootCheckRunning=false;
+                rootAvailable=hasRoot;
+                if(rootWarning!=null)rootWarning.setVisibility(hasRoot?View.GONE:View.VISIBLE);
             });
         },"wifitester-root-check").start();
     }

@@ -322,7 +322,7 @@ public final class MonitorModeActivity extends Activity {
             }
             if(pid>1L){
                 Result signal=runRoot("kill -INT "+pid+" 2>/dev/null || true; echo CAPTURE_INTERRUPT_SENT",2500);
-                append("已请求 tcpdump 完成写入并关闭 PCAP：\n"+trim(signal.output,600));
+                runOnUiThread(()->append("已请求 tcpdump 完成写入并关闭 PCAP：\n"+trim(signal.output,600)));
             }
             Process p=captureProcess;
             if(p!=null){
@@ -334,7 +334,7 @@ public final class MonitorModeActivity extends Activity {
                 }
                 if(!finished){
                     p.destroy();
-                    append("警告：抓包进程未及时退出，已终止等待；请检查导出的文件是否完整。");
+                    runOnUiThread(()->append("警告：抓包进程未及时退出，已终止等待；请检查导出的文件是否完整。"));
                 }
             }
             captureProcess=null;capturePid=-1L;

@@ -70,7 +70,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git ls-files | grep -E '(^|/)(build|\\.gradle)/'; then
+          if git ls-files | grep -E '(^|/)(build|\.gradle)/'; then
             echo 'Generated Gradle/Android outputs must not be committed.' >&2
             exit 1
           fi

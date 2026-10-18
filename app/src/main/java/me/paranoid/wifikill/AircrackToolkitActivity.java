@@ -132,8 +132,9 @@ public final class AircrackToolkitActivity extends Activity {
     private void openCapture() {
         Intent i=new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
+        // PCAPNG files are reported with inconsistent MIME types by document providers.
+        // Offer all file types here and validate the actual magic bytes before analysis.
         i.setType("*/*");
-        i.putExtra(Intent.EXTRA_MIME_TYPES,new String[]{"application/vnd.tcpdump.pcap","application/octet-stream"});
         startActivityForResult(i,OPEN_CAPTURE);
     }
 

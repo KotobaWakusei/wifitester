@@ -36,6 +36,7 @@ public final class MonitorModeActivity extends Activity {
     private TextView rootState, capabilityState, log;
     private Spinner ifaceSpinner, channelSpinner;
     private Button startButton, stopButton, exportButton, captureExportButton, refreshButton;
+    private final MonitorModeBackend monitorBackend=new IwMonitorModeBackend();
     private final ArrayList<String> interfaces=new ArrayList<>();
     private final ArrayList<WifiChannelParser.Channel> channels=new ArrayList<>();
     private final StringBuilder diagnostics=new StringBuilder();
@@ -95,7 +96,7 @@ public final class MonitorModeActivity extends Activity {
         startButton.setEnabled(false);rootState.setText("Root：正在验证授权…");capabilityState.setText("无线能力：正在枚举接口、频道和工具…");
         new Thread(()->{
             BundledToolchain.InstallResult embedded=new BundledToolchain(this).install();
-            Result r=runRoot("id; echo __IW_PATH__; command -v iw; echo __TCPDUMP_PATH__; command -v tcpdump; echo __IP_PATH__; command -v ip; echo __IW_LIST__; iw list 2>&1; echo __IW_DEV__; iw dev 2>&1; echo __LINKS__; ip -o link show 2>&1",15000);
+            Result r=runRoot(monitorBackend.probeCommand(),15000);
             String out=r.output==null?"":r.output;
             boolean rootOk=r.code==0 && Pattern.compile("\\buid=0(?:\\(|\\b)").matcher(out).find();
             ArrayList<String> found=discoverInterfaces(out);
@@ -201,16 +202,7 @@ public final class MonitorModeActivity extends Activity {
                 });
                 return;
             }
-            String cmd="set -e; IF='"+activeInterface+"'; MON='"+selectedMonitor+"'; "+
-                    "command -v iw >/dev/null; command -v ip >/dev/null; "+
-                    "if iw dev \"$MON\" info >/dev/null 2>&1; then echo 'ERROR: monitor interface already exists'; exit 7; fi; "+
-                    "ip link set \"$IF\" down; "+
-                    "if ! iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then "+
-                    "iw dev \"$IF\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; exit $rc; }; fi; "+
-                    "echo MONITOR_CREATED; "+
-                    "iw dev \"$MON\" set freq "+channel.frequency+" HT20 || { freq_rc=$?; echo CHANNEL_FREQ_FAILED:$freq_rc; "+ 
-                    "iw dev \"$MON\" set channel "+channel.number+" HT20 || { rc=$?; echo CHANNEL_SET_FAILED:$rc; echo CHANNEL_DIAGNOSTICS_BEGIN; iw dev \"$MON\" info 2>&1; iw list 2>&1 | sed -n '/Frequencies:/,/valid interface combinations:/p' | head -n 100; echo CHANNEL_DIAGNOSTICS_END; exit $rc; }; }; "+
-                    "ip link set \"$MON\" up || { rc=$?; echo MONITOR_UP_FAILED:$rc; exit $rc; }; echo MONITOR_READY";
+            String cmd=monitorBackend.buildStartCommand(activeInterface,selectedMonitor,channel);
             Result r=runRoot(cmd,12000);
             final String oldState=state;
             runOnUiThread(()->{
@@ -219,11 +211,9 @@ public final class MonitorModeActivity extends Activity {
                 if(r.code!=0||r.output==null||!r.output.contains("MONITOR_READY")){
                     // Only delete an interface this invocation actually created.
                     // An existing wfkmon0 must never be removed on the preflight-error path.
-                    String cleanup="";
-                    if(r.output!=null && r.output.contains("MONITOR_CREATED")){
-                        cleanup+="iw dev '"+selectedMonitor+"' del >/dev/null 2>&1 || true; ";
-                    }
-                    cleanup+="ip link set '"+activeInterface+"' "+("up".equals(oldState)?"up":"down")+" >/dev/null 2>&1 || true";
+                    String cleanup=monitorBackend.buildFailedStartCleanupCommand(
+                            activeInterface,selectedMonitor,oldState,
+                            r.output!=null&&r.output.contains("MONITOR_CREATED"));
                     // Complete cleanup before allowing another start attempt; otherwise a
                     // fast retry can race the old cleanup and trigger another EBUSY.
                     String failure="监听启动失败；请查看日志。";
@@ -339,7 +329,7 @@ public final class MonitorModeActivity extends Activity {
             }
             captureProcess=null;capturePid=-1L;
             String restore=("up".equals(previousInterfaceState)?"up":"down");
-            Result r=runRoot("ip link set '"+selectedMonitor+"' down >/dev/null 2>&1 || true; iw dev '"+selectedMonitor+"' del >/dev/null 2>&1 || true; ip link set '"+activeInterface+"' "+restore+" >/dev/null 2>&1 || true; echo RESTORE_ATTEMPTED",8000);
+            Result r=runRoot(monitorBackend.buildStopCommand(activeInterface,selectedMonitor,previousInterfaceState),8000); iw dev '"+selectedMonitor+"' del >/dev/null 2>&1 || true; ip link set '"+activeInterface+"' "+restore+" >/dev/null 2>&1 || true; echo RESTORE_ATTEMPTED",8000);
             boolean canExport=isUsableCapture(latestCaptureFile);
             runOnUiThread(()->{
                 running=false;createdMonitor=false;stopButton.setEnabled(false);startButton.setEnabled(rootGranted&&!channels.isEmpty()&&!interfaces.isEmpty());refreshButton.setEnabled(true);

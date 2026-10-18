@@ -112,6 +112,9 @@ public final class WiFiAuditActivity extends Activity {
         actions.setOrientation(LinearLayout.HORIZONTAL);
         scanButton = new Button(this);
         scanButton.setText("扫描 / 刷新");
+        scanButton.setAllCaps(false);
+        scanButton.setTextColor(0xffffffff);
+        scanButton.setBackground(roundButton(0xff315d91));
         scanButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -123,6 +126,9 @@ public final class WiFiAuditActivity extends Activity {
 
         exportButton = new Button(this);
         exportButton.setText("导出报告");
+        exportButton.setAllCaps(false);
+        exportButton.setTextColor(0xffffffff);
+        exportButton.setBackground(roundButton(0xff263a56));
         exportButton.setEnabled(false);
         exportButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -152,7 +158,7 @@ public final class WiFiAuditActivity extends Activity {
         setContentView(root);
     }
 
-    private int dp(int value) {
+    private android.graphics.drawable.GradientDrawable roundButton(int color) {\n        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();\n        d.setColor(color);\n        d.setCornerRadius(dp(14));\n        d.setStroke(dp(1), 0xff3b506e);\n        return d;\n    }\n\n    private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
@@ -331,7 +337,16 @@ public final class WiFiAuditActivity extends Activity {
     }
 
     private static String classifySecurity(String capabilities) {
-        return WifiScanParser.classifySecurity(capabilities);
+        String value = WifiScanParser.classifySecurity(capabilities);
+        switch (value) {
+            case "Enhanced Open (OWE)": return "增强型开放网络（OWE）";
+            case "WPA3": return "WPA3";
+            case "WPA2": return "WPA2";
+            case "WPA (legacy)": return "WPA（旧式加密）";
+            case "WEP (legacy)": return "WEP（旧式加密）";
+            case "Open": return "开放网络";
+            default: return "未知";
+        }
     }
 
     private static String bandForFrequency(int frequency) {

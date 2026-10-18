@@ -29,18 +29,13 @@ jobs:
           gradle-version: '8.7'
 
       - name: Install Android NDK
-        shell: bash
-        run: |
-          set -euo pipefail
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -path '*/bin/sdkmanager' -type f 2>/dev/null | sort -V | tail -n 1)"
-          if [[ -z "$SDKMANAGER" ]]; then
-            echo "sdkmanager not found under $SDK_ROOT/cmdline-tools" >&2
-            find "$SDK_ROOT" -maxdepth 4 -type f -name sdkmanager -print || true
-            exit 2
-          fi
-          yes | "$SDKMANAGER" --licenses >/dev/null
-          "$SDKMANAGER" "ndk;27.2.12479018"
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: 27.2.12479018
+          add-to-path: false
+
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y flex bison
 
       - name: Build bundled Android ARM64 tools
         run: bash tools/build-android-toolchain.sh

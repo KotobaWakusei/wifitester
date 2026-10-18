@@ -112,6 +112,7 @@ public final class AircrackToolkitActivity extends Activity {
                 "for q in /data/data/com.termux/files/usr/bin/\"$t\" /system/bin/\"$t\" /usr/bin/\"$t\" /usr/sbin/\"$t\"; do "+
                 "[ -x \"$q\" ] && { p=\"$q\"; break; }; done; fi; "+
                 "if [ -n \"$p\" ]; then printf '%s: %s\\n' \"$t\" \"$p\"; else printf '%s: 未找到\\n' \"$t\"; fi; done";
+            BundledToolchain.InstallResult embedded=new BundledToolchain(this).install();
             Result result=runRoot(command,10000);
             final String output=result.output;
             runOnUiThread(()->{
@@ -120,7 +121,7 @@ public final class AircrackToolkitActivity extends Activity {
                 if(result.code!=0 && (output==null||output.trim().isEmpty())){
                     toolStatus.setText("无法完成检测。请确认 Root 管理器已授权本应用。\n退出码："+result.code);
                 }else{
-                    toolStatus.setText(output+(result.code==0?"\n\n检测完成。工具是否存在不代表无线驱动支持全部功能。":"\n\n检测命令退出码："+result.code));
+                    toolStatus.setText("内置工具（"+new BundledToolchain(this).getAbi()+"）："+embedded.message+"\n"+(embedded.installed.isEmpty()?"未释放任何内置命令":"已释放："+android.text.TextUtils.join(", ",embedded.installed))+"\n"+output+(result.code==0?"\n\n检测完成。工具是否存在不代表无线驱动支持全部功能。":"\n\n检测命令退出码："+result.code));
                 }
             });
         });
@@ -185,7 +186,7 @@ public final class AircrackToolkitActivity extends Activity {
         StringBuilder out=new StringBuilder();
         int code=-1;
         try{
-            p=new ProcessBuilder("su","-c",command).redirectErrorStream(true).start();
+            p=new ProcessBuilder("su","-c",new BundledToolchain(this).shellEnvironment()+command).redirectErrorStream(true).start();
             final Process process=p;
             Thread reader=new Thread(()->{
                 try(BufferedReader r=new BufferedReader(new InputStreamReader(process.getInputStream()))){

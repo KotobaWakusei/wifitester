@@ -251,15 +251,12 @@ public final class MonitorModeActivity extends Activity {
                 String path=BundledToolchain.quote(target.getAbsolutePath());
                 String iface=BundledToolchain.quote(selectedMonitor);
                 String owner=String.valueOf(android.os.Process.myUid());
-                String shell=new BundledToolchain(this).shellEnvironment()
                 int packetLimit=getSharedPreferences("wifitester_settings",MODE_PRIVATE).getInt("capture_packet_limit",50000);
                 if(packetLimit!=5000&&packetLimit!=20000&&packetLimit!=50000)packetLimit=50000;
                 int snaplen=getSharedPreferences("wifitester_settings",MODE_PRIVATE).getInt("capture_snaplen",512);
                 if(snaplen!=256&&snaplen!=512&&snaplen!=1024)snaplen=512;
                 String shell=new BundledToolchain(this).shellEnvironment()
                         +"umask 022; tcpdump -i "+iface+" -U -n -s "+snaplen+" -c "+packetLimit+" -w "+path
-                        +" & CAPTURE_PID=$!; echo WIFITESTER_CAPTURE_PID:$CAPTURE_PID; wait \"$CAPTURE_PID\"; "
-                        +"RC=$?; chown "+owner+":"+owner+" "+path+" >/dev/null 2>&1 || true; chmod 600 "+path+" >/dev/null 2>&1 || true; exit $RC";
                         +" & CAPTURE_PID=$!; echo WIFITESTER_CAPTURE_PID:$CAPTURE_PID; wait \"$CAPTURE_PID\"; "
                         +"RC=$?; chown "+owner+":"+owner+" "+path+" >/dev/null 2>&1 || true; chmod 600 "+path+" >/dev/null 2>&1 || true; exit $RC";
                 Process process=new ProcessBuilder("su","-c",shell).redirectErrorStream(true).start();

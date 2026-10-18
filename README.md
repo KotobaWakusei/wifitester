@@ -1,64 +1,65 @@
-# WifiKiller — Wireless Workbench
+# WiFiTester — 无线诊断工作台
 
-A rooted-Android utility for **passive Wi-Fi diagnostics** and read-only security inventory. Device and driver capabilities vary; a successful APK build does not guarantee that monitor mode is available on a particular phone.
+WiFiTester 是面向已取得 Root 权限的 Android 设备的 **被动 Wi-Fi 诊断与只读网络信息工具**。不同手机、厂商固件和无线驱动的能力存在差异；APK 构建成功并不代表某台手机一定支持 Monitor（监听）模式。
 
-## Current features
+## 功能
 
-- **Root status** — verifies that `su -c id` actually returns UID 0; the check has a timeout so a pending root-manager prompt cannot leave the dashboard stuck forever.
-- **Monitor-mode workbench** — discovers interfaces and frequencies advertised by `iw`, lets the user choose a channel, starts `tcpdump`, and records timestamped diagnostics.
-- **State-aware cleanup** — records the selected interface's administrative UP/DOWN state, avoids deleting a monitor interface it did not create, and attempts to restore the original interface after stopping or a failed start.
-- **Diagnostic export** — saves the current diagnostic log to a user-selected text file.
-- **Read-only Wi-Fi inventory** — uses Android's public Wi-Fi scan API to display visible SSIDs, BSSIDs, signal levels, frequency/channel, and reported security capabilities; it can share a text report.
+- **Root 权限检测**：通过执行 `su -c id` 并验证返回结果是否为 UID 0，判断是否真正获得 Root；检测包含超时，避免授权弹窗未处理时界面永久卡住。
+- **监听模式工作台**：枚举无线接口、驱动公开的频道和工具，允许选择接口与频道，启动被动抓包并记录带时间戳的诊断信息。
+- **状态感知的恢复流程**：记录接口原始 UP/DOWN 状态；不会删除本应用未创建的监听接口，并在停止或启动失败时尽力恢复原状态。
+- **诊断报告导出**：将当前诊断日志保存为用户指定的文本文件。
+- **只读 Wi-Fi 网络清单**：通过 Android 公共 Wi-Fi 扫描 API 展示可见 SSID、BSSID、信号强度、频率/频道及系统报告的安全能力，并支持分享文本报告。
+- **现代化中文界面**：中文仪表盘、监听工作台、网络审计页面、清晰的状态信息与诊断提示。
 
-## Requirements
+## 系统要求
 
-- Android 5.0+ (API 21+) for installation; recent Android versions and OEM builds may impose additional restrictions.
-- Root access granted by a root manager.
-- For monitor mode: working `iw`, `ip`, and `tcpdump` commands, plus a kernel driver that supports monitor interfaces and the selected channel.
-- Wi-Fi scanning in the inventory screen requires Android location permission and may depend on the system Location toggle and scan throttling.
+- Android 5.0（API 21）或更高版本；较新的 Android 版本和厂商系统可能施加额外限制。
+- 通过 Root 管理器授予本应用 Root 权限。
+- 监听模式需要可用的 `iw`、`ip` 和 `tcpdump` 命令，以及支持 Monitor 虚拟接口和目标频道的内核驱动。
+- Wi-Fi 扫描需要 Android 定位权限；部分设备还要求打开系统定位开关，并可能受到扫描频率限制。
 
-## Build
+## 构建
 
-The project uses Gradle 8.7, JDK 17, and Android SDK Platform 34.
+项目使用 Gradle 8.7、JDK 17 和 Android SDK Platform 34。
 
 ```bash
 gradle --no-daemon assembleDebug
 ```
 
-The APK is produced at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions builds the debug APK on pull requests and pushes to `master`; open the relevant workflow run and download the `wifikill-debug-apk` artifact.
+APK 输出路径为 `app/build/outputs/apk/debug/app-debug.apk`。GitHub Actions 会在推送和 Pull Request 事件中构建调试版 APK；请在对应工作流运行记录中下载 `wifikill-debug-apk` 构建产物。
 
-## Using monitor mode
+## 使用监听模式
 
-1. Open **Wireless Workbench** and grant Root when prompted.
-2. Open **Monitor Mode** and tap **重新检测设备** to refresh the detected interfaces, tools, and driver-advertised channels.
-3. Choose an interface and channel, then read and accept the interruption warning before starting.
-4. Inspect the diagnostics and passive `tcpdump` output.
-5. Tap **停止并恢复** when finished. Confirm that normal Wi-Fi connectivity has returned.
-6. Use **导出完整诊断报告** to save a text report if troubleshooting is needed.
+1. 打开 **WiFiTester 无线诊断**，按提示在 Root 管理器中授权。
+2. 进入 **监听模式**，点击 **重新检测设备**，刷新无线接口、工具和驱动公开的频道。
+3. 选择接口与频道，仔细阅读可能导致 Wi-Fi 中断的提示，再启动监听。
+4. 查看诊断日志和被动 `tcpdump` 输出。
+5. 完成后点击 **停止并恢复**，并确认普通 Wi-Fi 连接已恢复。
+6. 排查问题时，使用 **导出完整诊断报告** 保存文本报告。
 
-### Important limitations
+## 已知限制
 
-- `iw list` reports driver-advertised capabilities, not a guarantee that interface creation or channel tuning will succeed at runtime.
-- Some OEM drivers do not support concurrent managed and monitor interfaces. Starting monitor mode may interrupt Wi-Fi.
-- Android/vendor policy, regulatory domain, firmware, and root-manager behavior can affect results.
-- Cleanup is best-effort. If the device does not recover automatically, stop the app and restore Wi-Fi from Android settings; do not assume a successful command means the radio is fully restored.
-- Channel numbers are derived from the frequency data exposed by the driver or Android scan API. They are not a promise that every channel is legal or usable in every region.
+- `iw list` 仅反映驱动公开声明的能力，不保证运行时一定能创建接口或切换频道。
+- 部分厂商驱动不支持 Managed 与 Monitor 接口并发；启动监听可能中断当前 Wi-Fi。
+- Android/厂商策略、监管域、固件和 Root 管理器行为都可能影响结果。
+- 清理与恢复流程尽力而为。如果设备未能自动恢复，请停止应用并在 Android 设置中恢复 Wi-Fi；不要仅凭命令返回成功就认定无线功能已完全恢复。
+- 频道编号来自驱动或 Android 扫描 API 提供的频率信息，不代表所有地区都允许或支持使用对应频道。
 
-## Safety and privacy
+## 安全与隐私
 
-- The monitor workflow is intended for **passive reception and diagnosis**. Use it only on devices and networks you own or are authorized to test.
-- Switching channels or bringing an interface down can disconnect the phone from its current network.
-- Reports can contain nearby SSIDs, BSSIDs, signal levels, device model, Android version, and command output. Review a report before sharing it.
-- The legacy interactive deauthentication screens have been removed from the app flow. Legacy backend code is still being audited for safe removal; do not assume every historical class or resource has already been deleted.
+- 监听工作流仅用于**被动接收与诊断**。请只在自己拥有或获得明确授权的设备和网络上使用。
+- 切换频道或关闭接口可能导致手机与当前 Wi-Fi 网络断开。
+- 诊断报告可能包含附近的 SSID、BSSID、信号强度、设备型号、Android 版本和命令输出。分享前请先检查并移除不应公开的信息。
+- 旧版交互式断开认证界面已从应用流程中移除。历史后端代码仍需进一步审计，不能假设所有旧类或资源均已删除。
 
-## Troubleshooting
+## 故障排查
 
-- **Root unavailable:** open the root manager and verify that WifiKiller is authorized, then tap the Root card to retry.
-- **No interfaces or channels:** confirm that `iw` works under Root and inspect the exported diagnostic report.
-- **Monitor startup failed:** review the command output. The driver may reject monitor interface creation, concurrent interfaces, or the requested frequency.
-- **Wi-Fi does not return:** use Android settings to toggle Wi-Fi, then collect a diagnostic report before retrying.
-- **No scan results:** grant location permission, enable the system Location toggle if required by the device, and retry after Android's scan-throttle window.
+- **Root 不可用**：打开 Root 管理器确认已授权 WiFiTester，然后点击首页 Root 状态卡片重新检测。
+- **未发现接口或频道**：确认 Root 环境下的 `iw` 可以运行，并导出诊断报告查看详细输出。
+- **监听启动失败**：检查命令输出。驱动可能拒绝创建 Monitor 接口、拒绝并发接口，或不支持所选频率。
+- **Wi-Fi 未恢复**：在 Android 系统设置中关闭并重新打开 Wi-Fi，然后先收集诊断报告再重试。
+- **扫描结果为空**：授予定位权限；如设备要求，请打开系统定位开关，并在 Android 扫描限流窗口过后重试。
 
-## Development status
+## 开发与验证状态
 
-CI validates compilation and APK packaging. It does **not** replace on-device testing of Root authorization, monitor-mode startup, channel tuning, capture output, stop/restore behavior, or report export. Please include the device model, Android build, driver/tool output, and diagnostic report (after reviewing it for private data) when reporting a bug.
+CI 负责验证代码编译和 APK 打包，但不能替代真机测试。Root 授权、监听模式启动、频道切换、抓包输出、停止/恢复以及报告导出仍需在实际设备上验证。反馈问题时，请提供设备型号、Android 构建版本、驱动/工具输出和诊断报告（分享前先检查其中的隐私信息）。

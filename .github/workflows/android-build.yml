@@ -28,6 +28,14 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Install Android NDK
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "ndk;27.2.12479018"
+
+      - name: Build bundled Android ARM64 tools
+        run: bash tools/build-android-toolchain.sh
+
       - name: Run unit tests
         run: gradle --no-daemon testDebugUnitTest
 

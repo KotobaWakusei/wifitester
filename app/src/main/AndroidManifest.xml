@@ -46,6 +46,12 @@
 
 
         <activity
+            android:name="me.paranoid.wifikill.AircrackToolkitActivity"
+            android:exported="false"
+            android:label="Aircrack-ng 工作台"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
+        <activity
             android:name="me.paranoid.wifikill.WiFiAuditActivity"
             android:exported="false"
             android:label="Wi-Fi 网络信息"

@@ -7,6 +7,7 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.view.Gravity;
+import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -15,163 +16,182 @@ import java.io.InputStreamReader;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** Rebuilt launcher: capability-oriented, modern, and independent of legacy screens. */
+/** Modern capability-oriented launcher for WiFiTester. */
 public final class DashboardActivity extends Activity {
-    private static final int BG=0xff0b1020, PANEL=0xff151f33, ACCENT=0xff78b8ff, MUTED=0xffa8b5ca;
-    private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private TextView rootValue, rootDetail, summary, toolchainSummary;
+    private static final int BG=0xff0b1020, PANEL=0xff151f33, PANEL_ALT=0xff10192b;
+    private static final int ACCENT=0xff8fc5ff, MUTED=0xffa8b5ca, WHITE=Color.WHITE;
+    private static final String PREFS="wifitester_settings", KEY_AUTO_ROOT="auto_root_check";
+    private final ExecutorService worker=Executors.newSingleThreadExecutor();
+    private TextView rootValue,rootDetail,toolchainSummary;
     private boolean checking;
 
-    @Override protected void onCreate(Bundle state) {
+    @Override protected void onCreate(Bundle state){
         super.onCreate(state);
         getWindow().setStatusBarColor(BG);
         getWindow().setNavigationBarColor(BG);
+        getWindow().getDecorView().setSystemUiVisibility(0);
         buildUi();
     }
 
-    private void buildUi() {
+    private void buildUi(){
         ScrollView scroll=new ScrollView(this);
         scroll.setFillViewport(true);
         scroll.setBackgroundColor(BG);
-        LinearLayout root=new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(22),dp(26),dp(22),dp(28));
-        scroll.addView(root);
+        LinearLayout page=new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(20),dp(22),dp(20),dp(28));
+        scroll.addView(page);
 
-        root.addView(text("WIFITESTER  /  无线诊断工作台",11,ACCENT,true));
-        TextView title=text("无线诊断\n工作台",32,Color.WHITE,true);
-        title.setPadding(0,dp(10),0,dp(7));
-        root.addView(title);
-        root.addView(text("无线诊断、驱动能力检测与被动分析",14,MUTED,false));
+        LinearLayout header=new LinearLayout(this);
+        header.setGravity(Gravity.CENTER_VERTICAL);
+        header.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout brand=new LinearLayout(this);
+        brand.setOrientation(LinearLayout.VERTICAL);
+        brand.addView(text("WIFITESTER  /  WIRELESS LAB",11,ACCENT,true));
+        brand.addView(text("无线诊断工作台",27,WHITE,true),top(5));
+        header.addView(brand,new LinearLayout.LayoutParams(0,-2,1));
+        TextView settings=text("⚙ 设置",14,ACCENT,true);
+        settings.setGravity(Gravity.CENTER);
+        settings.setPadding(dp(13),dp(10),dp(13),dp(10));
+        settings.setBackground(round(PANEL,dp(14)));
+        settings.setOnClickListener(v->startActivity(new Intent(this,SettingsActivity.class)));
+        header.addView(settings);
+        page.addView(header,bottom(18));
+        page.addView(text("从设备能力检测开始，再进入对应的无线工具。",14,MUTED,false),bottom(18));
 
-        LinearLayout rootCard=card();
-        rootCard.setOnClickListener(v->refreshRoot());
-        rootCard.addView(text("ROOT 权限状态",11,ACCENT,true));
-        rootValue=text("正在检测…",22,Color.WHITE,true);
-        rootValue.setPadding(0,dp(8),0,dp(4));
-        rootCard.addView(rootValue);
-        rootDetail=text("正在验证 su 是否实际授予 UID 0 权限",13,MUTED,false);
-        rootCard.addView(rootDetail);
-        TextView refresh=text("点击重新检测   ↻",13,ACCENT,true);
+        LinearLayout status=card();
+        status.setBackground(round(PANEL_ALT,dp(20)));
+        status.addView(text("设备权限",11,ACCENT,true));
+        rootValue=text("正在检测 Root…",21,WHITE,true);
+        status.addView(rootValue,top(7));
+        rootDetail=text("验证 su 是否实际返回 UID 0。",13,MUTED,false);
+        status.addView(rootDetail,top(4));
+        TextView refresh=text("手动重新检测  ↻",13,ACCENT,true);
         refresh.setPadding(0,dp(12),0,0);
-        rootCard.addView(refresh);
-        root.addView(rootCard, bottom());
+        status.addView(refresh);
+        status.setOnClickListener(v->refreshRoot());
+        page.addView(status,bottom(20));
 
-        LinearLayout monitor=card();
-        monitor.setOnClickListener(v->startActivity(new Intent(this,MonitorModeActivity.class)));
-        monitor.addView(text("01  /  监听模式",12,ACCENT,true));
-        monitor.addView(text("无线监听工作台",21,Color.WHITE,true), top(8));
-        monitor.addView(text("接口检测 · 驱动频道枚举 · 被动抓包 · 诊断报告导出",13,MUTED,false), top(6));
-        TextView action=text("打开监听工作台   →",14,ACCENT,true);
-        action.setPadding(0,dp(14),0,0);
-        monitor.addView(action);
-        root.addView(monitor,bottom());
-
-        LinearLayout audit=card();
-        audit.addView(text("02  /  只读审计",12,ACCENT,true));
-        audit.addView(text("Wi-Fi 网络信息",19,Color.WHITE,true),top(8));
-        audit.addView(text("查看附近可见的 Wi-Fi 网络、信号强度、频段和安全类型。",13,MUTED,false),top(5));
-        audit.setOnClickListener(v->startActivity(new Intent(this,WiFiAuditActivity.class)));
-        root.addView(audit,bottom());
+        page.addView(text("工具工作台",17,WHITE,true),bottom(10));
+        addFeature(page,"01","监听模式","接口与频道能力检测 · 被动抓包 · 诊断报告",
+                "打开监听工作台  →",()->startActivity(new Intent(this,MonitorModeActivity.class)));
+        addFeature(page,"02","Aircrack-ng GUI 工具","工具链状态 · 抓包文件检查 · 只读离线分析",
+                "打开 Aircrack-ng 工具  →",()->startActivity(new Intent(this,AircrackToolkitActivity.class)));
+        addFeature(page,"03","Wi-Fi / SSID 扫描","查看系统可见网络、信号强度、频段与安全类型",
+                "查看附近网络  →",()->startActivity(new Intent(this,WiFiAuditActivity.class)));
 
         LinearLayout tools=card();
+        tools.addView(text("工具链概览",16,WHITE,true));
+        toolchainSummary=text("启用 Root 检测后，可查看无线工具是否可用。",13,MUTED,false);
+        tools.addView(toolchainSummary,top(8));
+        TextView details=text("查看完整工具检测  →",13,ACCENT,true);
+        tools.addView(details,top(12));
         tools.setOnClickListener(v->startActivity(new Intent(this,AircrackToolkitActivity.class)));
-        tools.addView(text("03  /  AIRCRACK-NG 工具链",12,ACCENT,true));
-        tools.addView(text("Aircrack-ng 图形工作台",20,Color.WHITE,true),top(8));
-        tools.addView(text("检测工具环境、进入被动监听、只读分析已有抓包文件。",13,MUTED,false),top(6));
-        TextView toolsAction=text("打开工具工作台   →",14,ACCENT,true);
-        toolsAction.setPadding(0,dp(14),0,0);
-        tools.addView(toolsAction);
-        root.addView(tools,bottom());
+        page.addView(tools,bottom(18));
 
-        LinearLayout toolchain=card();
-        toolchain.addView(text("04  /  ROOT 工具链状态",12,ACCENT,true));
-        toolchain.addView(text("Aircrack-ng 与无线诊断依赖",18,Color.WHITE,true),top(8));
-        toolchainSummary=text("正在等待 Root 环境检测…",13,MUTED,false);
-        toolchainSummary.setPadding(0,dp(8),0,0);
-        toolchain.addView(toolchainSummary);
-        TextView openTools=text("查看完整工具检测   →",14,ACCENT,true);
-        openTools.setPadding(0,dp(12),0,0);
-        toolchain.addView(openTools);
-        toolchain.setOnClickListener(v->startActivity(new Intent(this,AircrackToolkitActivity.class)));
-        root.addView(toolchain,bottom());
-
-        LinearLayout info=card();
-        info.addView(text("设备兼容性",16,Color.WHITE,true));
-        summary=text("尚未检测无线能力。进入监听工作台后将检查接口、工具和驱动公开的频道。",13,MUTED,false);
-        summary.setPadding(0,dp(8),0,0);
-        info.addView(summary);
-        root.addView(info);
-        TextView footer=text("默认被动接收  ·  不发送无线注入",10,MUTED,true);
-        footer.setGravity(Gravity.CENTER);
-        footer.setPadding(0,dp(24),0,0);
-        root.addView(footer);
+        TextView safety=text("被动优先  ·  仅对有权测试的网络进行诊断",11,MUTED,false);
+        safety.setGravity(Gravity.CENTER);
+        safety.setPadding(0,dp(10),0,0);
+        page.addView(safety);
         setContentView(scroll);
     }
 
-    private void refreshRoot() {
-        if(checking || rootValue==null) return;
+    private void addFeature(LinearLayout parent,String number,String title,String description,String action,Runnable click){
+        LinearLayout item=card();
+        item.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout heading=new LinearLayout(this);
+        heading.setGravity(Gravity.CENTER_VERTICAL);
+        TextView index=text(number,12,ACCENT,true);
+        index.setGravity(Gravity.CENTER);
+        index.setBackground(round(0xff203754,dp(10)));
+        index.setPadding(dp(10),dp(8),dp(10),dp(8));
+        heading.addView(index);
+        TextView name=text(title,19,WHITE,true);
+        LinearLayout.LayoutParams nameParams=new LinearLayout.LayoutParams(0,-2,1);
+        nameParams.leftMargin=dp(11);
+        heading.addView(name,nameParams);
+        item.addView(heading);
+        item.addView(text(description,13,MUTED,false),top(10));
+        item.addView(text(action,14,ACCENT,true),top(14));
+        item.setOnClickListener(v->click.run());
+        parent.addView(item,bottom(11));
+    }
+
+    private void refreshRoot(){
+        if(checking||rootValue==null)return;
         checking=true;
         rootValue.setText("正在检测…");
         worker.execute(()->{
-            String out="";
-            int code=-1;
-            try {
-                Process p=new ProcessBuilder("su","-c","id; for t in aircrack-ng airodump-ng airmon-ng tcpdump iw ip capinfos tshark; do p=$(command -v $t 2>/dev/null || true); if [ -z \"$p\" ]; then for q in /data/data/com.termux/files/usr/bin/$t /system/bin/$t /usr/bin/$t /usr/sbin/$t; do [ -x \"$q\" ] && { p=\"$q\"; break; }; done; fi; if [ -n \"$p\" ]; then printf 'TOOL:%s:%s\\n' \"$t\" \"$p\"; else printf 'TOOL:%s:MISSING\\n' \"$t\"; fi; done").redirectErrorStream(true).start();
-                StringBuilder b=new StringBuilder();
+            String out="";int code=-1;Process process=null;
+            try{
+                String command="id; for t in aircrack-ng airodump-ng airmon-ng tcpdump iw ip capinfos tshark; do p=$(command -v \"$t\" 2>/dev/null || true); if [ -z \"$p\" ]; then for q in /data/data/com.termux/files/usr/bin/$t /system/bin/$t /usr/bin/$t /usr/sbin/$t; do [ -x \"$q\" ] && { p=\"$q\"; break; }; done; fi; if [ -n \"$p\" ]; then printf 'TOOL:%s:%s\\n' \"$t\" \"$p\"; else printf 'TOOL:%s:MISSING\\n' \"$t\"; fi; done";
+                process=new ProcessBuilder("su","-c",command).redirectErrorStream(true).start();
+                StringBuilder output=new StringBuilder();
+                Process p=process;
                 Thread reader=new Thread(()->{
                     try(BufferedReader r=new BufferedReader(new InputStreamReader(p.getInputStream()))){
-                        String line;
-                        while((line=r.readLine())!=null){
-                            synchronized(b){b.append(line).append('\n');}
-                        }
+                        String line;while((line=r.readLine())!=null){synchronized(output){output.append(line).append('\n');}}
                     }catch(Exception ignored){}
                 },"wfk-root-check-reader");
                 reader.start();
                 long deadline=System.currentTimeMillis()+15000L;
                 boolean finished=false;
                 while(System.currentTimeMillis()<deadline){
-                    try{code=p.exitValue();finished=true;break;}
+                    try{code=process.exitValue();finished=true;break;}
                     catch(IllegalThreadStateException running){Thread.sleep(50L);}
                 }
                 if(!finished){
-                    p.destroy();
-                    try{reader.join(1000L);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();}
-                    out="Root 权限检测超时（15 秒）。请检查 Root 管理器是否正在等待授权。";
-                    code=-1;
+                    process.destroy();
+                    try{reader.join(1000L);}catch(InterruptedException e){Thread.currentThread().interrupt();}
+                    out="Root 检测超时（15 秒）；请检查 Root 管理器授权提示。";code=-1;
                 }else{
                     reader.join(1500L);
-                    synchronized(b){out=b.toString().trim();}
+                    synchronized(output){out=output.toString().trim();}
                 }
-            } catch(Exception e){out=e.getClass().getSimpleName()+": "+String.valueOf(e.getMessage());}
-            final String result=out; final int exit=code;
+            }catch(Exception e){out=e.getClass().getSimpleName()+": "+String.valueOf(e.getMessage());}
+            final String result=out;final int exit=code;
             runOnUiThread(()->{
                 checking=false;
-                boolean granted=exit==0 && result.matches("(?s).*\\buid=0(?:\\(|\\b).*");
+                boolean granted=exit==0&&result.matches("(?s).*\\buid=0(?:\\(|\\b).*");
                 rootValue.setText(granted?"Root 已授权":"Root 不可用");
                 rootValue.setTextColor(granted?0xff79e0b0:0xffffa1a1);
-                rootDetail.setText(granted?"su 命令已实际返回 UID 0":"请在 Root 管理器中授权本应用；仅存在 su 文件不代表已授权。\n"+result);
-                StringBuilder tools=new StringBuilder();
+                rootDetail.setText(granted?"已确认 su 返回 UID 0。":"请检查 Root 管理器是否已授权本应用。\n"+result);
+                StringBuilder summary=new StringBuilder();
                 for(String line:result.split("\\n")){
                     if(!line.startsWith("TOOL:"))continue;
                     String[] parts=line.split(":",3);
                     if(parts.length<3)continue;
-                    if(tools.length()>0)tools.append("\\n");
-                    tools.append(parts[1]).append("  ·  ").append("MISSING".equals(parts[2])?"未安装":parts[2]);
+                    if(summary.length()>0)summary.append('\n');
+                    summary.append(parts[1]).append("  ·  ").append("MISSING".equals(parts[2])?"未安装":parts[2]);
                 }
-                toolchainSummary.setText(granted?(tools.length()==0?"已获得 Root，但未读取到工具检测结果。":tools.toString()):"需要先授予 Root 权限，才能检测系统工具。");
+                toolchainSummary.setText(granted?(summary.length()==0?"已获得 Root，但未读取到工具信息。":summary.toString()):"请先授予 Root，再打开 Aircrack-ng GUI 查看工具链。");
             });
         });
     }
 
-    // Check when the screen becomes active; a five-second su loop can repeatedly
-    // trigger root-manager authorization prompts when access has been denied.
-    @Override protected void onResume(){super.onResume();refreshRoot();}
+    @Override protected void onResume(){
+        super.onResume();
+        if(getSharedPreferences(PREFS,MODE_PRIVATE).getBoolean(KEY_AUTO_ROOT,true)){
+            refreshRoot();
+        }else if(rootValue!=null){
+            rootValue.setText("自动检测已关闭");
+            rootValue.setTextColor(WHITE);
+            rootDetail.setText("点按此卡片可随时手动检查 Root 权限。");
+            toolchainSummary.setText("自动检测已关闭；可进入 Aircrack-ng GUI 手动检测工具链。");
+        }
+    }
     @Override protected void onDestroy(){worker.shutdownNow();super.onDestroy();}
-    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(18),dp(18),dp(18),dp(18));GradientDrawable bg=round(PANEL,dp(18));bg.setStroke(dp(1),0xff26344c);l.setBackground(bg);l.setElevation(dp(2));return l;}
-    private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
+    private LinearLayout card(){
+        LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);
+        l.setPadding(dp(17),dp(17),dp(17),dp(17));
+        GradientDrawable bg=round(PANEL,dp(18));bg.setStroke(dp(1),0xff26344c);l.setBackground(bg);l.setElevation(dp(2));return l;
+    }
+    private TextView text(String value,int size,int color,boolean bold){
+        TextView t=new TextView(this);t.setText(value);t.setTextSize(size);t.setTextColor(color);
+        if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;
+    }
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(radius);return d;}
-    private LinearLayout.LayoutParams bottom(){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(12);return p;}
-    private LinearLayout.LayoutParams top(int v){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(v);return p;}
-    private int dp(float v){return (int)(v*getResources().getDisplayMetrics().density+0.5f);}
+    private LinearLayout.LayoutParams bottom(int value){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.bottomMargin=dp(value);return p;}
+    private LinearLayout.LayoutParams top(int value){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(value);return p;}
+    private int dp(float value){return (int)(value*getResources().getDisplayMetrics().density+0.5f);}
 }

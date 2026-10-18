@@ -42,6 +42,12 @@
             android:label="监听模式"
             android:theme="@android:style/Theme.Material.NoActionBar" />
 
+        <activity
+            android:name="me.paranoid.wifikill.SettingsActivity"
+            android:exported="false"
+            android:label="WiFiTester 设置"
+            android:theme="@android:style/Theme.Material.NoActionBar" />
+
 
 
 

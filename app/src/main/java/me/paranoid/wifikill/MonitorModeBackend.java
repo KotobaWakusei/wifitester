@@ -46,8 +46,8 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
             throw new IllegalArgumentException("频道参数无效");
         }
 
-        return "set -e; IF=" + BundledToolchain.quote(parent) + "; MON="
-                + BundledToolchain.quote(monitor) + "; " +
+        return "set -e; IF=" + quoteInterface(parent) + "; MON="
+                + quoteInterface(monitor) + "; " +
                 "command -v iw >/dev/null; command -v ip >/dev/null; " +
                 "if iw dev \"$MON\" info >/dev/null 2>&1; then echo 'ERROR: monitor interface already exists'; exit 7; fi; " +
                 "ip link set \"$IF\" down; " +
@@ -66,8 +66,8 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                                                            String monitorInterface,
                                                            String originalState,
                                                            boolean monitorWasCreated) {
-        String parent = BundledToolchain.quote(validateInterface(parentInterface));
-        String monitor = BundledToolchain.quote(validateInterface(monitorInterface));
+        String parent = quoteInterface(validateInterface(parentInterface));
+        String monitor = quoteInterface(validateInterface(monitorInterface));
         String state = normalizedState(originalState);
         StringBuilder command = new StringBuilder();
         if (monitorWasCreated) {
@@ -83,8 +83,8 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
 
     @Override public String buildStopCommand(String parentInterface, String monitorInterface,
                                              String originalState) {
-        String parent = BundledToolchain.quote(validateInterface(parentInterface));
-        String monitor = BundledToolchain.quote(validateInterface(monitorInterface));
+        String parent = quoteInterface(validateInterface(parentInterface));
+        String monitor = quoteInterface(validateInterface(monitorInterface));
         String state = normalizedState(originalState);
         return "ip link set " + monitor + " down >/dev/null 2>&1 || true; " +
                 "iw dev " + monitor + " del >/dev/null 2>&1 || true; " +

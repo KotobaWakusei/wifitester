@@ -19,7 +19,7 @@ import java.util.concurrent.Executors;
 public final class DashboardActivity extends Activity {
     private static final int BG=0xff0b1020, PANEL=0xff151f33, ACCENT=0xff78b8ff, MUTED=0xffa8b5ca;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
-    private TextView rootValue, rootDetail, summary;
+    private TextView rootValue, rootDetail, summary, toolchainSummary;
     private boolean checking;
 
     @Override protected void onCreate(Bundle state) {
@@ -84,6 +84,18 @@ public final class DashboardActivity extends Activity {
         tools.addView(toolsAction);
         root.addView(tools,bottom());
 
+        LinearLayout toolchain=card();
+        toolchain.addView(text("04  /  ROOT 工具链状态",12,ACCENT,true));
+        toolchain.addView(text("Aircrack-ng 与无线诊断依赖",18,Color.WHITE,true),top(8));
+        toolchainSummary=text("正在等待 Root 环境检测…",13,MUTED,false);
+        toolchainSummary.setPadding(0,dp(8),0,0);
+        toolchain.addView(toolchainSummary);
+        TextView openTools=text("查看完整工具检测   →",14,ACCENT,true);
+        openTools.setPadding(0,dp(12),0,0);
+        toolchain.addView(openTools);
+        toolchain.setOnClickListener(v->startActivity(new Intent(this,AircrackToolkitActivity.class)));
+        root.addView(toolchain,bottom());
+
         LinearLayout info=card();
         info.addView(text("设备兼容性",16,Color.WHITE,true));
         summary=text("尚未检测无线能力。进入监听工作台后将检查接口、工具和驱动公开的频道。",13,MUTED,false);
@@ -105,7 +117,7 @@ public final class DashboardActivity extends Activity {
             String out="";
             int code=-1;
             try {
-                Process p=new ProcessBuilder("su","-c","id").redirectErrorStream(true).start();
+                Process p=new ProcessBuilder("su","-c","id; for t in aircrack-ng airodump-ng airmon-ng tcpdump iw ip capinfos tshark; do p=$(command -v \\"$t\\" 2>/dev/null || true); if [ -z \\"$p\\" ]; then for q in /data/data/com.termux/files/usr/bin/\\"$t\\" /system/bin/\\"$t\\" /usr/bin/\\"$t\\" /usr/sbin/\\"$t\\"; do [ -x \\"$q\\" ] && { p=\\"$q\\"; break; }; done; fi; if [ -n \\"$p\\" ]; then printf \\"TOOL:%s:%s\\\\n\\" \\"$t\\" \\"$p\\"; else printf \\"TOOL:%s:MISSING\\\\n\\" \\"$t\\"; fi; done").redirectErrorStream(true).start();
                 StringBuilder b=new StringBuilder();
                 Thread reader=new Thread(()->{
                     try(BufferedReader r=new BufferedReader(new InputStreamReader(p.getInputStream()))){

@@ -215,15 +215,24 @@ public final class MonitorModeActivity extends Activity {
                         cleanup+="iw dev '"+selectedMonitor+"' del >/dev/null 2>&1 || true; ";
                     }
                     cleanup+="ip link set '"+activeInterface+"' "+("up".equals(oldState)?"up":"down")+" >/dev/null 2>&1 || true";
-                    // Keep monitor deletion and original-interface restoration in one
-                    // privileged shell so two independent su processes cannot race.
-                    runRootAsync(cleanup);
+                    // Complete cleanup before allowing another start attempt; otherwise a
+                    // fast retry can race the old cleanup and trigger another EBUSY.
                     String failure="监听启动失败；请查看日志。";
                     if(r.output!=null && r.output.contains("MONITOR_CREATE_FAILED")) failure="驱动拒绝创建监听接口。若错误为 EBUSY（-16），可能是接口/驱动资源冲突，或该驱动不允许创建 Monitor 接口。";
-                    else if(r.output!=null && r.output.contains("CHANNEL_SET_FAILED")) failure="监听接口已创建，但驱动拒绝切换到所选频道；程序将清理本次创建的接口并恢复原状态。";
-                    else if(r.output!=null && r.output.contains("MONITOR_UP_FAILED")) failure="监听接口已创建，但无法启用该接口；程序将清理本次创建的接口并恢复原状态。";
-                    capabilityState.setText(failure);
-                    startButton.setEnabled(true);refreshButton.setEnabled(true);return;
+                    else if(r.output!=null && r.output.contains("CHANNEL_SET_FAILED")) failure="监听接口已创建，但驱动拒绝切换到所选频道；正在清理接口并恢复原状态。";
+                    else if(r.output!=null && r.output.contains("MONITOR_UP_FAILED")) failure="监听接口已创建，但无法启用该接口；正在清理接口并恢复原状态。";
+                    final String failureMessage=failure;
+                    startButton.setEnabled(false);refreshButton.setEnabled(false);
+                    new Thread(()->{
+                        Result cleanupResult=runRoot(cleanup,6000);
+                        runOnUiThread(()->{
+                            append("===== 清理与恢复 =====\\n退出码："+cleanupResult.code+"\\n"+trim(cleanupResult.output,1200));
+                            capabilityState.setText(failureMessage);
+                            startButton.setEnabled(rootGranted&&!channels.isEmpty()&&!interfaces.isEmpty());
+                            refreshButton.setEnabled(true);
+                        });
+                    }).start();
+                    return;
                 }
                 running=true;createdMonitor=true;stopButton.setEnabled(true);
                 capabilityState.setText("监听接口已启动：捕获 "+channel.label+" 的可见帧。");

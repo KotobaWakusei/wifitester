@@ -292,8 +292,8 @@ public final class WiFiAuditActivity extends Activity {
 
         StringBuilder text = new StringBuilder();
         if (latestResults.isEmpty()) {
-            text.append("No access points are available in the current scan cache.\n")
-                    .append("Tap “Scan / refresh” and check Android location settings.");
+            text.append("当前扫描缓存中没有可用的接入点。\n")
+                    .append("点击“扫描 / 刷新”，并检查 Android 定位权限和系统定位开关。");
         } else {
             for (int index = 0; index < latestResults.size(); index++) {
                 ScanResult result = latestResults.get(index);
@@ -303,21 +303,21 @@ public final class WiFiAuditActivity extends Activity {
                         .append(result.SSID == null || result.SSID.isEmpty()
                                 ? "<hidden SSID>" : safeValue(result.SSID))
                         .append("\n");
-                text.append("   BSSID: ").append(safeValue(result.BSSID)).append("\n");
-                text.append("   Security: ").append(security).append("\n");
-                text.append("   Signal: ").append(result.level).append(" dBm  |  ")
+                text.append("   B网络名称（SSID）：").append(safeValue(result.BSSID)).append("\n");
+                text.append("   安全类型：").append(security).append("\n");
+                text.append("   信号强度：").append(result.level).append(" dBm  |  ")
                         .append(bandForFrequency(result.frequency)).append("  |  channel ")
                         .append(channelForFrequency(result.frequency)).append("\n");
-                text.append("   Capabilities: ").append(safeValue(capabilities)).append("\n");
-                if ("Open".equals(security) || "WEP (legacy)".equals(security)) {
-                    text.append("   Notice: weak or absent link-layer protection; verify "
-                            + "whether this network is intended to be public.\n");
+                text.append("   能力信息：").append(safeValue(capabilities)).append("\n");
+                if ("开放网络".equals(security) || "WEP（旧式加密）".equals(security)) {
+                    text.append("   提示：链路层保护较弱或未加密，请确认"
+                            + "该网络是否为公开网络。\n");
                 }
                 text.append("\n");
             }
         }
         resultsView.setText(text.toString());
-        statusView.setText(statusPrefix + "\nAccess points found: " + latestResults.size());
+        statusView.setText(statusPrefix + "\n发现的网络数量：" + latestResults.size());
         exportButton.setEnabled(!latestResults.isEmpty());
     }
 
@@ -335,33 +335,33 @@ public final class WiFiAuditActivity extends Activity {
 
     private void exportReport() {
         if (latestResults.isEmpty()) {
-            statusView.setText("There are no scan results to export.");
+            statusView.setText("没有可导出的扫描结果。");
             return;
         }
         StringBuilder report = new StringBuilder();
-        report.append("Wi-Fi security inventory\n");
-        report.append("Generated: ").append(new SimpleDateFormat(
+        report.append("Wi-Fi 网络安全信息\n");
+        report.append("生成时间：").append(new SimpleDateFormat(
                 "yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append("\n");
-        report.append("Android: ").append(safeValue(Build.VERSION.RELEASE))
+        report.append("Android 版本：").append(safeValue(Build.VERSION.RELEASE))
                 .append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\n");
-        report.append("Access points: ").append(latestResults.size()).append("\n\n");
+        report.append("可见网络数量：").append(latestResults.size()).append("\n\n");
         for (ScanResult result : latestResults) {
             String capabilities = result.capabilities == null ? "" : result.capabilities;
-            report.append("SSID: ").append(result.SSID == null || result.SSID.isEmpty()
+            report.append("网络名称（SSID）：").append(result.SSID == null || result.SSID.isEmpty()
                     ? "<hidden SSID>" : safeValue(result.SSID)).append("\n");
-            report.append("BSSID: ").append(safeValue(result.BSSID)).append("\n");
-            report.append("Security: ").append(classifySecurity(capabilities)).append("\n");
-            report.append("Signal: ").append(result.level).append(" dBm\n");
-            report.append("Frequency: ").append(result.frequency).append(" MHz\n");
-            report.append("Channel: ").append(channelForFrequency(result.frequency)).append("\n");
-            report.append("Capabilities: ").append(safeValue(capabilities)).append("\n\n");
+            report.append("B网络名称（SSID）：").append(safeValue(result.BSSID)).append("\n");
+            report.append("安全类型：").append(classifySecurity(capabilities)).append("\n");
+            report.append("信号强度：").append(result.level).append(" dBm\n");
+            report.append("频率：").append(result.frequency).append(" MHz\n");
+            report.append("频道：").append(channelForFrequency(result.frequency)).append("\n");
+            report.append("能力信息：").append(safeValue(capabilities)).append("\n\n");
         }
 
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Wi-Fi security inventory");
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Wi-Fi 网络安全信息");
         shareIntent.putExtra(Intent.EXTRA_TEXT, report.toString());
-        startActivity(Intent.createChooser(shareIntent, "Export Wi-Fi report"));
+        startActivity(Intent.createChooser(shareIntent, "导出 Wi-Fi 报告"));
     }
 
     private static String safeValue(String value) {

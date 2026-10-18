@@ -122,6 +122,10 @@ public final class MonitorModeActivity extends Activity {
         Matcher m=Pattern.compile("(?m)^\\s*Interface\\s+([A-Za-z0-9_.-]+)\\s*$").matcher(section);
         while(m.find()){
             String n=m.group(1);
+            String lower=n.toLowerCase(Locale.US);
+            // Wi-Fi Aware/NAN and P2P virtual interfaces are not preferred
+            // as monitor-mode parents; their names can begin with "wifi".
+            if(lower.contains("aware")||lower.startsWith("p2p")) continue;
             if(!n.startsWith("wfkmon")&&!n.equals("lo")&&!found.contains(n))found.add(n);
         }
         if(found.isEmpty()){
@@ -137,10 +141,12 @@ public final class MonitorModeActivity extends Activity {
 
     private int interfacePriority(String name){
         String n=name.toLowerCase(Locale.US);
-        if(n.startsWith("wlan")||n.startsWith("wifi")||n.startsWith("wl"))return 0;
+        if(n.startsWith("wlan")||n.startsWith("wl"))return 0;
         if(n.startsWith("ath"))return 1;
-        if(n.startsWith("p2p")||n.contains("ap")||n.contains("aware"))return 3;
-        return 2;
+        if(n.startsWith("wifi"))return 2;
+        if(n.startsWith("p2p")||n.contains("aware"))return 4;
+        if(n.contains("ap"))return 3;
+        return 3;
     }
 
     private boolean toolPath(String out,String marker){
@@ -191,8 +197,10 @@ public final class MonitorModeActivity extends Activity {
                     "if iw dev \"$MON\" info >/dev/null 2>&1; then echo 'ERROR: monitor interface already exists'; exit 7; fi; "+
                     "ip link set \"$IF\" down; "+
                     "if ! iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then "+
-                    "iw dev \"$IF\" interface add \"$MON\" type monitor; fi; echo 监听接口创建成功标记; "+
-                    "iw dev \"$MON\" set freq "+channel.frequency+" HT20; ip link set \"$MON\" up; echo MONITOR_READY";
+                    "iw dev \"$IF\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; exit $rc; }; fi; "+
+                    "echo MONITOR_CREATED; "+
+                    "iw dev \"$MON\" set freq "+channel.frequency+" HT20 || { rc=$?; echo CHANNEL_SET_FAILED:$rc; exit $rc; }; "+
+                    "ip link set \"$MON\" up || { rc=$?; echo MONITOR_UP_FAILED:$rc; exit $rc; }; echo MONITOR_READY";
             Result r=runRoot(cmd,12000);
             final String oldState=state;
             runOnUiThread(()->{
@@ -202,14 +210,18 @@ public final class MonitorModeActivity extends Activity {
                     // Only delete an interface this invocation actually created.
                     // An existing wfkmon0 must never be removed on the preflight-error path.
                     String cleanup="";
-                    if(r.output!=null && r.output.contains("监听接口创建成功标记")){
+                    if(r.output!=null && r.output.contains("MONITOR_CREATED")){
                         cleanup+="iw dev '"+selectedMonitor+"' del >/dev/null 2>&1 || true; ";
                     }
                     cleanup+="ip link set '"+activeInterface+"' "+("up".equals(oldState)?"up":"down")+" >/dev/null 2>&1 || true";
                     // Keep monitor deletion and original-interface restoration in one
                     // privileged shell so two independent su processes cannot race.
                     runRootAsync(cleanup);
-                    capabilityState.setText("监听启动失败；请查看日志。可能原因：驱动不支持接口并发、频道不受支持或接口被系统占用。");
+                    String failure="监听启动失败；请查看日志。";
+                    if(r.output!=null && r.output.contains("MONITOR_CREATE_FAILED")) failure="驱动拒绝创建监听接口。若错误为 EBUSY（-16），可能是接口/驱动资源冲突，或该驱动不允许创建 Monitor 接口。";
+                    else if(r.output!=null && r.output.contains("CHANNEL_SET_FAILED")) failure="监听接口已创建，但驱动拒绝切换到所选频道；程序将清理本次创建的接口并恢复原状态。";
+                    else if(r.output!=null && r.output.contains("MONITOR_UP_FAILED")) failure="监听接口已创建，但无法启用该接口；程序将清理本次创建的接口并恢复原状态。";
+                    capabilityState.setText(failure);
                     startButton.setEnabled(true);refreshButton.setEnabled(true);return;
                 }
                 running=true;createdMonitor=true;stopButton.setEnabled(true);

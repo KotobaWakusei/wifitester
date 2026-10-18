@@ -5,9 +5,13 @@ set -euo pipefail
 # The binary is packaged as an APK asset and extracted by BundledToolchain.
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 NDK_VERSION="${NDK_VERSION:-27.2.12479018}"
-NDK="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-${ANDROID_HOME:-}/ndk/${NDK_VERSION}}"
-if [[ ! -d "$NDK" && -n "${ANDROID_HOME:-}" ]]; then
+NDK="${ANDROID_NDK_HOME:-${ANDROID_NDK_ROOT:-}}"
+if [[ -z "$NDK" && -n "${ANDROID_HOME:-}" ]]; then
   NDK="${ANDROID_HOME}/ndk/${NDK_VERSION}"
+fi
+if [[ -z "$NDK" ]]; then
+  echo "Android NDK path not found; set ANDROID_NDK_HOME or ANDROID_HOME" >&2
+  exit 2
 fi
 if [[ ! -d "$NDK" ]]; then
   echo "Android NDK not found at $NDK" >&2

@@ -44,7 +44,7 @@ public final class DashboardActivity extends Activity {
     private TextView wifiState, connectedName, connectedDetails, rootWarning, scanSummary;
     private LinearLayout networkList;
     private int selectedTab=0;
-    private boolean rootCheckStarted=false;
+    private volatile boolean rootCheckRunning=false;\n    private Boolean rootAvailable=null;
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -161,7 +161,7 @@ public final class DashboardActivity extends Activity {
         rootWarning.setBackground(round(0xfffff0d9,dp(13)));
         root.addView(rootWarning,bottom(12));
         // Hidden unless Root really is unavailable.
-        rootWarning.setVisibility(View.GONE);
+        rootWarning.setVisibility(Boolean.FALSE.equals(rootAvailable)?View.VISIBLE:View.GONE);\n        rootWarning.setText("⚠ 未获得 Root 权限。普通 Wi-Fi 信息仍可查看；监听模式、底层接口操作和部分抓包功能需要在 Root 管理器中授权。");
 
         LinearLayout connected=card();
         connected.addView(text("当前连接",16,INK,true));

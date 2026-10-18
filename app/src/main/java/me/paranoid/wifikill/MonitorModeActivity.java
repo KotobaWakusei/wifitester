@@ -191,7 +191,7 @@ public final class MonitorModeActivity extends Activity {
                     "if iw dev \"$MON\" info >/dev/null 2>&1; then echo 'ERROR: monitor interface already exists'; exit 7; fi; "+
                     "ip link set \"$IF\" down; "+
                     "if ! iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then "+
-                    "iw dev \"$IF\" interface add \"$MON\" type monitor; fi; echo MONITOR_CREATED; "+
+                    "iw dev \"$IF\" interface add \"$MON\" type monitor; fi; echo 监听接口创建成功标记; "+
                     "iw dev \"$MON\" set freq "+channel.frequency+" HT20; ip link set \"$MON\" up; echo MONITOR_READY";
             Result r=runRoot(cmd,12000);
             final String oldState=state;
@@ -202,7 +202,7 @@ public final class MonitorModeActivity extends Activity {
                     // Only delete an interface this invocation actually created.
                     // An existing wfkmon0 must never be removed on the preflight-error path.
                     String cleanup="";
-                    if(r.output!=null && r.output.contains("MONITOR_CREATED")){
+                    if(r.output!=null && r.output.contains("监听接口创建成功标记")){
                         cleanup+="iw dev '"+selectedMonitor+"' del >/dev/null 2>&1 || true; ";
                     }
                     cleanup+="ip link set '"+activeInterface+"' "+("up".equals(oldState)?"up":"down")+" >/dev/null 2>&1 || true";
@@ -248,10 +248,10 @@ public final class MonitorModeActivity extends Activity {
     private void exportReport(){
         StringBuilder report=new StringBuilder();
         report.append("WiFiKill 监听模式 diagnostics\n生成时间：").append(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z",Locale.US).format(new java.util.Date())).append("\n");
-        report.append("App version: ").append(getPackageName()).append("\nAndroid 版本：").append(android.os.Build.VERSION.RELEASE).append(" (SDK ").append(android.os.Build.VERSION.SDK_INT).append(")\n");
-        report.append("Device: ").append(android.os.Build.MANUFACTURER).append(" ").append(android.os.Build.MODEL).append("\nRoot currently granted: ").append(rootGranted).append("\n");
-        report.append("Selected interface: ").append(ifaceSpinner.getSelectedItem()==null?"-":ifaceSpinner.getSelectedItem()).append("\n");
-        report.append("Selected channel: ").append(channelSpinner.getSelectedItem()==null?"-":channelSpinner.getSelectedItem()).append("\nMonitor running: ").append(running).append("\n\n");
+        report.append("应用版本：").append(getPackageName()).append("\nAndroid 版本：").append(android.os.Build.VERSION.RELEASE).append(" (SDK ").append(android.os.Build.VERSION.SDK_INT).append(")\n");
+        report.append("设备：").append(android.os.Build.MANUFACTURER).append(" ").append(android.os.Build.MODEL).append("\nRoot currently granted: ").append(rootGranted).append("\n");
+        report.append("选定接口：").append(ifaceSpinner.getSelectedItem()==null?"-":ifaceSpinner.getSelectedItem()).append("\n");
+        report.append("选定频道：").append(channelSpinner.getSelectedItem()==null?"-":channelSpinner.getSelectedItem()).append("\nMonitor running: ").append(running).append("\n\n");
         synchronized(diagnostics){report.append(diagnostics);}
         Intent intent=new Intent(Intent.ACTION_CREATE_DOCUMENT);intent.addCategory(Intent.CATEGORY_OPENABLE);intent.setType("text/plain");intent.putExtra(Intent.EXTRA_TITLE,"wifikill-diagnostics-"+System.currentTimeMillis()+".txt");
         pendingReport=report.toString();
@@ -300,9 +300,9 @@ public final class MonitorModeActivity extends Activity {
     private void runRootAsync(String cmd){new Thread(()->runRoot(cmd,8000)).start();}
     private String trim(String s,int max){if(s==null)return "";return s.length()<=max?s:"…（较早输出已截断）…\n"+s.substring(s.length()-max);}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
-    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(16),dp(16),dp(16),dp(16));l.setBackground(round(PANEL,dp(16)));return l;}
+    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(1);l.setPadding(dp(17),dp(17),dp(17),dp(17));GradientDrawable bg=round(PANEL,dp(17));bg.setStroke(dp(1),0xff26344c);l.setBackground(bg);l.setElevation(dp(2));return l;}
     private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
-    private Button button(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setBackground(round(color,dp(12)));return b;}
+    private Button button(String s,int color){Button b=new Button(this);b.setText(s);b.setTextColor(Color.WHITE);b.setAllCaps(false);b.setMinHeight(dp(48));b.setBackground(round(color,dp(14)));if(android.os.Build.VERSION.SDK_INT>=21)b.setElevation(dp(1));return b;}
     private GradientDrawable round(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(radius);return d;}
     private LinearLayout.LayoutParams top(int v){LinearLayout.LayoutParams p=new LinearLayout.LayoutParams(-1,-2);p.topMargin=dp(v);return p;}
     private int dp(float v){return (int)(v*getResources().getDisplayMetrics().density+0.5f);}

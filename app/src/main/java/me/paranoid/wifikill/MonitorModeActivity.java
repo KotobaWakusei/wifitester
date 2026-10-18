@@ -201,7 +201,7 @@ public final class MonitorModeActivity extends Activity {
                     "if ! iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then "+
                     "iw dev \"$IF\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; exit $rc; }; fi; "+
                     "echo MONITOR_CREATED; "+
-                    "iw dev \"$MON\" set freq "+channel.frequency+" HT20 || { rc=$?; echo CHANNEL_SET_FAILED:$rc; exit $rc; }; "+
+                    "iw dev \"$MON\" set freq "+channel.frequency+" HT20 || { rc=$?; echo CHANNEL_SET_FAILED:$rc; echo CHANNEL_DIAGNOSTICS_BEGIN; iw dev \"$MON\" info 2>&1; iw list 2>&1 | sed -n '/Frequencies:/,/valid interface combinations:/p' | head -n 100; echo CHANNEL_DIAGNOSTICS_END; exit $rc; }; "+
                     "ip link set \"$MON\" up || { rc=$?; echo MONITOR_UP_FAILED:$rc; exit $rc; }; echo MONITOR_READY";
             Result r=runRoot(cmd,12000);
             final String oldState=state;
@@ -220,7 +220,7 @@ public final class MonitorModeActivity extends Activity {
                     // fast retry can race the old cleanup and trigger another EBUSY.
                     String failure="监听启动失败；请查看日志。";
                     if(r.output!=null && r.output.contains("MONITOR_CREATE_FAILED")) failure="驱动拒绝创建监听接口。若错误为 EBUSY（-16），可能是接口/驱动资源冲突，或该驱动不允许创建 Monitor 接口。";
-                    else if(r.output!=null && r.output.contains("CHANNEL_SET_FAILED")) failure="监听接口已创建，但驱动拒绝切换到所选频道；正在清理接口并恢复原状态。";
+                    else if(r.output!=null && r.output.contains("CHANNEL_SET_FAILED")) failure="监听接口已创建，但驱动拒绝切换频道（常见原因：驱动未实现 monitor 调谐、PHY 正被其他虚拟接口占用，或频道受监管域限制）；已采集驱动诊断并正在清理、恢复。";
                     else if(r.output!=null && r.output.contains("MONITOR_UP_FAILED")) failure="监听接口已创建，但无法启用该接口；正在清理接口并恢复原状态。";
                     final String failureMessage=failure;
                     final String cleanupCommand=cleanup;

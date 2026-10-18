@@ -158,7 +158,15 @@ public final class WiFiAuditActivity extends Activity {
         setContentView(root);
     }
 
-    private android.graphics.drawable.GradientDrawable roundButton(int color) {\n        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();\n        d.setColor(color);\n        d.setCornerRadius(dp(14));\n        d.setStroke(dp(1), 0xff3b506e);\n        return d;\n    }\n\n    private int dp(int value) {
+    private android.graphics.drawable.GradientDrawable roundButton(int color) {
+        android.graphics.drawable.GradientDrawable d = new android.graphics.drawable.GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(dp(14));
+        d.setStroke(dp(1), 0xff3b506e);
+        return d;
+    }
+
+    private int dp(int value) {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 

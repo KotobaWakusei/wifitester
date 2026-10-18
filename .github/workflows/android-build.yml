@@ -32,16 +32,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
-          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -path '*/bin/sdkmanager' -type f 2>/dev/null | sort -V | tail -n 1)"
-          if [[ -z "$SDKMANAGER" ]]; then
-            echo "sdkmanager not found under $SDK_ROOT/cmdline-tools" >&2
-            exit 2
-          fi
-          yes | "$SDKMANAGER" --sdk_root="$SDK_ROOT" --licenses >/dev/null
-          "$SDKMANAGER" --sdk_root="$SDK_ROOT" --install "ndk;27.2.12479018"
-          echo "ANDROID_HOME=$SDK_ROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_NDK_HOME=$SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          NDK_ZIP="$RUNNER_TEMP/android-ndk-r27c-linux.zip"
+          NDK_DIR="$RUNNER_TEMP/android-ndk-r27c"
+          curl --fail --location --retry 3 --retry-delay 2 \
+            https://dl.google.com/android/repository/android-ndk-r27c-linux.zip \
+            --output "$NDK_ZIP"
+          unzip -q "$NDK_ZIP" -d "$RUNNER_TEMP"
+          mv "$RUNNER_TEMP/android-ndk-r27c" "$NDK_DIR"
+          echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+          echo "NDK_VERSION=27.2.12479018" >> "$GITHUB_ENV"
+          "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android23-clang" --version
 
       - name: Install native build dependencies
         run: sudo apt-get update && sudo apt-get install -y flex bison

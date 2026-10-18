@@ -10,14 +10,15 @@ WiFiTester 是面向已取得 Root 权限的 Android 设备的 **被动 Wi-Fi �
 - **诊断报告导出**：将当前诊断日志保存为用户指定的文本文件。
 - **只读 Wi-Fi 网络清单**：通过 Android 公共 Wi-Fi 扫描 API 展示可见 SSID、BSSID、信号强度、频率/频道及系统报告的安全能力，并支持分享文本报告。
 - **现代化中文界面**：中文仪表盘、监听工作台、网络审计页面、清晰的状态信息与诊断提示。
-- **Aircrack-ng 图形工作台**：检测 `aircrack-ng`、`airodump-ng`、`airmon-ng`、`tcpdump`、`iw`、`ip` 及只读抓包分析工具是否已安装；提供监听工作台和网络信息入口；可选择 PCAP/PCAPNG 文件，优先调用 `capinfos` 或 `tshark` 读取元数据。该页面不会自动下载或捆绑 Aircrack-ng 二进制文件。
+- **内置工具链基础设施**：APK 可携带按 ABI 区分的命令行工具，首次启动时释放到应用私有目录，并配置专用 `PATH` 与 `LD_LIBRARY_PATH`。当前 CI 正在构建并打包 Android ARM64 的 `tcpdump`（静态链接 libpcap）；其他工具仍需逐项完成 Android 原生构建与集成。
+- **Aircrack-ng 图形工作台**：检测当前可用的 `aircrack-ng`、`airodump-ng`、`airmon-ng`、`tcpdump`、`iw`、`ip` 及只读抓包分析工具；提供监听工作台和网络信息入口；可选择 PCAP/PCAPNG 文件，优先调用 `capinfos` 或 `tshark` 读取元数据。
 
 ## 系统要求
 
 - Android 5.0（API 21）或更高版本；较新的 Android 版本和厂商系统可能施加额外限制。
 - 通过 Root 管理器授予本应用 Root 权限。
-- 监听模式需要可用的 `iw`、`ip` 和 `tcpdump` 命令，以及支持 Monitor 虚拟接口和目标频道的内核驱动。
-- Aircrack-ng 图形工作台只检测已有工具，不会在 Android 上自动安装工具链。抓包文件只读分析需要可用的 `capinfos` 或 `tshark`；文件大小限制为 200 MiB。
+- 当前构建流程尝试将 Android ARM64 版 `tcpdump` 与静态 libpcap 内置于 APK；监听模式仍需要可用的 `iw` 和 `ip`，并要求驱动支持 Monitor 虚拟接口与目标频道。不能将“工具内置”视为“驱动支持”。
+- 目前并非完整 Aircrack-ng 工具链：`aircrack-ng`、`airodump-ng`、`airmon-ng`、`iw`、`ip`、`capinfos` 和 `tshark` 仍可能需要设备已有环境提供。抓包文件只读分析需要可用的 `capinfos` 或 `tshark`；文件大小限制为 200 MiB。
 - Wi-Fi 扫描需要 Android 定位权限；部分设备还要求打开系统定位开关，并可能受到扫描频率限制。
 
 ## 构建

@@ -11,8 +11,8 @@
         android:id="@+id/kill_all"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textOn="kill all"
-        android:textOff="kill all"
+        android:textOn="全部停止"
+        android:textOff="全部停止"
         android:layout_alignParentRight="true"
         android:layout_centerVertical="true"/>
     <Switch
@@ -20,8 +20,8 @@
         android:id="@+id/attach_all"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:textOn="grab all"
-        android:textOff="grab all"
+        android:textOn="全部关联"
+        android:textOff="全部关联"
         android:layout_toLeftOf="@+id/kill_all"
         android:textAllCaps="true"/>
     <TextView

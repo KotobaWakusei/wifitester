@@ -10,12 +10,14 @@ WiFiTester 是面向已取得 Root 权限的 Android 设备的 **被动 Wi-Fi �
 - **诊断报告导出**：将当前诊断日志保存为用户指定的文本文件。
 - **只读 Wi-Fi 网络清单**：通过 Android 公共 Wi-Fi 扫描 API 展示可见 SSID、BSSID、信号强度、频率/频道及系统报告的安全能力，并支持分享文本报告。
 - **现代化中文界面**：中文仪表盘、监听工作台、网络审计页面、清晰的状态信息与诊断提示。
+- **Aircrack-ng 图形工作台**：检测 `aircrack-ng`、`airodump-ng`、`airmon-ng`、`tcpdump`、`iw`、`ip` 及只读抓包分析工具是否已安装；提供监听工作台和网络信息入口；可选择 PCAP/PCAPNG 文件，优先调用 `capinfos` 或 `tshark` 读取元数据。该页面不会自动下载或捆绑 Aircrack-ng 二进制文件。
 
 ## 系统要求
 
 - Android 5.0（API 21）或更高版本；较新的 Android 版本和厂商系统可能施加额外限制。
 - 通过 Root 管理器授予本应用 Root 权限。
 - 监听模式需要可用的 `iw`、`ip` 和 `tcpdump` 命令，以及支持 Monitor 虚拟接口和目标频道的内核驱动。
+- Aircrack-ng 图形工作台只检测已有工具，不会在 Android 上自动安装工具链。抓包文件只读分析需要可用的 `capinfos` 或 `tshark`；文件大小限制为 200 MiB。
 - Wi-Fi 扫描需要 Android 定位权限；部分设备还要求打开系统定位开关，并可能受到扫描频率限制。
 
 ## 构建
@@ -50,6 +52,7 @@ APK 输出路径为 `app/build/outputs/apk/debug/app-debug.apk`。GitHub Actions
 - 监听工作流仅用于**被动接收与诊断**。请只在自己拥有或获得明确授权的设备和网络上使用。
 - 切换频道或关闭接口可能导致手机与当前 Wi-Fi 网络断开。
 - 诊断报告可能包含附近的 SSID、BSSID、信号强度、设备型号、Android 版本和命令输出。分享前请先检查并移除不应公开的信息。
+- Aircrack-ng 工作台仅提供工具检测、被动监听入口和 PCAP/PCAPNG 只读元数据分析，不提供无线注入、断开他人连接或口令破解入口。
 - 旧版交互式断开认证界面已从应用流程中移除。历史后端代码仍需进一步审计，不能假设所有旧类或资源均已删除。
 
 ## 故障排查

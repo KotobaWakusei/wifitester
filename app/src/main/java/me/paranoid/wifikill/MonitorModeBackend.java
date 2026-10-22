@@ -21,6 +21,24 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
     private static final String DEV_MARKER = "__IW_DEV__";
     private static final String LINKS_MARKER = "__LINKS__";
 
+    /**
+     * Resolves the localized validation messages. The context is optional so
+     * that the backend can be unit tested without an Android runtime.
+     */
+    private final android.content.Context context;
+
+    IwMonitorModeBackend() {
+        this(null);
+    }
+
+    IwMonitorModeBackend(android.content.Context context) {
+        this.context = context;
+    }
+
+    private String message(int messageRes, String fallback) {
+        return context == null ? fallback : context.getString(messageRes);
+    }
+
     @Override public String id() {
         return "linux-iw";
     }
@@ -39,11 +57,13 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
         String parent = validateInterface(parentInterface);
         String monitor = validateInterface(monitorInterface);
         if (parent.equals(monitor)) {
-            throw new IllegalArgumentException("父接口与监听接口不能相同");
+            throw new IllegalArgumentException(message(R.string.monitor_error_same_interface,
+                    "The parent interface and the monitor interface must differ"));
         }
         if (channel == null || channel.number <= 0
                 || channel.frequency < 2300 || channel.frequency > 7125) {
-            throw new IllegalArgumentException("频道参数无效");
+            throw new IllegalArgumentException(message(R.string.monitor_error_channel_invalid,
+                    "Invalid channel parameter"));
         }
 
         return "set -e; IF=" + quoteInterface(parent) + "; MON="
@@ -97,9 +117,10 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
         return "'" + validatedInterface + "'";
     }
 
-    private static String validateInterface(String value) {
+    private String validateInterface(String value) {
         if (value == null || !value.matches("[A-Za-z0-9_.-]{1,15}")) {
-            throw new IllegalArgumentException("无线接口名格式无效");
+            throw new IllegalArgumentException(message(R.string.monitor_error_interface_name,
+                    "Invalid wireless interface name"));
         }
         return value;
     }

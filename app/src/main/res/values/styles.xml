@@ -1,5 +1,184 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <style name="AppTheme" parent="@android:style/Theme.Light">
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!--
+        Application theme. Material 3 with automatic day/night switching:
+        the colour roles are resolved from values/ and values-night/, so the
+        whole app follows the system theme unless the user forces a variant
+        in the settings screen.
+    -->
+    <style name="Theme.WiFiTester" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/primary</item>
+        <item name="colorOnPrimary">@color/on_primary</item>
+        <item name="colorPrimaryContainer">@color/primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/on_primary_container</item>
+
+        <item name="colorSecondary">@color/secondary</item>
+        <item name="colorOnSecondary">@color/on_secondary</item>
+        <item name="colorSecondaryContainer">@color/secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/on_secondary_container</item>
+
+        <item name="colorTertiary">@color/tertiary</item>
+        <item name="colorOnTertiary">@color/on_tertiary</item>
+        <item name="colorTertiaryContainer">@color/tertiary_container</item>
+        <item name="colorOnTertiaryContainer">@color/on_tertiary_container</item>
+
+        <item name="colorError">@color/error</item>
+        <item name="colorOnError">@color/on_error</item>
+        <item name="colorErrorContainer">@color/error_container</item>
+        <item name="colorOnErrorContainer">@color/on_error_container</item>
+
+        <item name="android:colorBackground">@color/background</item>
+        <item name="colorOnBackground">@color/on_background</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorOnSurface">@color/on_surface</item>
+        <item name="colorSurfaceVariant">@color/surface_variant</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_variant</item>
+        <item name="colorSurfaceInverse">@color/surface_inverse</item>
+        <item name="colorOnSurfaceInverse">@color/on_surface_inverse</item>
+        <item name="colorSurfaceBright">@color/surface_bright</item>
+        <item name="colorSurfaceDim">@color/surface_dim</item>
+        <item name="colorSurfaceContainerLowest">@color/surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/surface_container_highest</item>
+        <item name="colorOutline">@color/outline</item>
+        <item name="colorOutlineVariant">@color/outline_variant</item>
+
+        <!-- Application specific semantic roles. -->
+        <item name="colorSuccess">@color/success</item>
+        <item name="colorOnSuccess">@color/on_success</item>
+        <item name="colorSuccessContainer">@color/success_container</item>
+        <item name="colorOnSuccessContainer">@color/on_success_container</item>
+        <item name="colorWarning">@color/warning</item>
+        <item name="colorOnWarning">@color/on_warning</item>
+        <item name="colorWarningContainer">@color/warning_container</item>
+        <item name="colorOnWarningContainer">@color/on_warning_container</item>
+        <item name="colorLogBackground">@color/log_background</item>
+        <item name="colorLogText">@color/log_text</item>
+        <item name="colorLogAccent">@color/log_accent</item>
+        <item name="colorCodeBackground">@color/code_background</item>
+        <item name="colorCodeText">@color/code_text</item>
+        <item name="colorCodeAccent">@color/code_accent</item>
+
+        <!-- System bars follow the page background. -->
+        <item name="android:statusBarColor">@color/background</item>
+        <item name="android:navigationBarColor">@color/background</item>
+        <item name="android:windowBackground">@color/background</item>
+
+        <!-- Component defaults. -->
+        <item name="materialButtonStyle">@style/Widget.WiFiTester.Button</item>
+        <item name="materialCardViewStyle">@style/Widget.WiFiTester.Card</item>
+        <item name="chipStyle">@style/Widget.WiFiTester.Chip</item>
+        <item name="textInputStyle">@style/Widget.WiFiTester.TextInputLayout</item>
+        <item name="switchStyle">@style/Widget.WiFiTester.Switch</item>
+        <item name="bottomNavigationStyle">@style/Widget.WiFiTester.BottomNavigation</item>
+        <item name="materialAlertDialogTheme">@style/ThemeOverlay.WiFiTester.AlertDialog</item>
+        <item name="toolbarStyle">@style/Widget.WiFiTester.Toolbar</item>
+
+        <!-- Shape scale. -->
+        <item name="shapeAppearanceCornerExtraSmall">@style/ShapeAppearance.WiFiTester.ExtraSmall</item>
+        <item name="shapeAppearanceCornerSmall">@style/ShapeAppearance.WiFiTester.Small</item>
+        <item name="shapeAppearanceCornerMedium">@style/ShapeAppearance.WiFiTester.Medium</item>
+        <item name="shapeAppearanceCornerLarge">@style/ShapeAppearance.WiFiTester.Large</item>
     </style>
+
+    <!-- The dedicated workbenches share the same day/night aware theme. -->
+    <style name="MonitorTheme" parent="Theme.WiFiTester" />
+
+    <!-- Shape appearances -->
+    <style name="ShapeAppearance.WiFiTester.ExtraSmall" parent="ShapeAppearance.Material3.Corner.ExtraSmall">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">6dp</item>
+    </style>
+
+    <style name="ShapeAppearance.WiFiTester.Small" parent="ShapeAppearance.Material3.Corner.Small">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">10dp</item>
+    </style>
+
+    <style name="ShapeAppearance.WiFiTester.Medium" parent="ShapeAppearance.Material3.Corner.Medium">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <style name="ShapeAppearance.WiFiTester.Large" parent="ShapeAppearance.Material3.Corner.Large">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">22dp</item>
+    </style>
+
+    <!-- Buttons -->
+    <style name="Widget.WiFiTester.Button" parent="Widget.Material3.Button">
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:minHeight">@dimen/button_height</item>
+        <item name="android:textSize">@dimen/text_size_normal</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:letterSpacing">0</item>
+        <item name="cornerRadius">@dimen/button_radius</item>
+    </style>
+
+    <!-- Cards -->
+    <style name="Widget.WiFiTester.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardCornerRadius">@dimen/card_radius</item>
+        <item name="cardElevation">0dp</item>
+        <item name="cardBackgroundColor">@color/surface_container_lowest</item>
+        <item name="strokeColor">@color/outline_variant</item>
+        <item name="strokeWidth">@dimen/card_stroke</item>
+        <item name="contentPadding">@dimen/card_padding</item>
+    </style>
+
+    <!-- Chips -->
+    <style name="Widget.WiFiTester.Chip" parent="Widget.Material3.Chip.Assist">
+        <item name="chipMinHeight">28dp</item>
+        <item name="chipCornerRadius">@dimen/badge_radius</item>
+        <item name="android:textSize">@dimen/text_size_sm</item>
+        <item name="ensureMinTouchTargetSize">false</item>
+    </style>
+
+    <!-- Switches -->
+    <style name="Widget.WiFiTester.Switch" parent="Widget.Material3.CompoundButton.Switch" />
+
+    <!-- Text fields -->
+    <style name="Widget.WiFiTester.TextInputLayout" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxCornerRadiusTopStart">@dimen/field_radius</item>
+        <item name="boxCornerRadiusTopEnd">@dimen/field_radius</item>
+        <item name="boxCornerRadiusBottomStart">@dimen/field_radius</item>
+        <item name="boxCornerRadiusBottomEnd">@dimen/field_radius</item>
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="boxStrokeWidthFocused">2dp</item>
+        <item name="hintTextColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- Bottom navigation -->
+    <style name="Widget.WiFiTester.BottomNavigation" parent="Widget.Material3.BottomNavigationView">
+        <item name="android:background">@color/surface_container</item>
+        <item name="itemActiveIndicatorStyle">@style/Widget.WiFiTester.BottomNavigation.ActiveIndicator</item>
+        <item name="labelVisibilityMode">labeled</item>
+    </style>
+
+    <style name="Widget.WiFiTester.BottomNavigation.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
+        <item name="android:color">@color/secondary_container</item>
+        <item name="android:width">64dp</item>
+        <item name="android:height">32dp</item>
+    </style>
+
+    <!-- Toolbars -->
+    <style name="Widget.WiFiTester.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="titleTextColor">?attr/colorOnSurface</item>
+        <item name="subtitleTextColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+
+    <!-- Dialogs -->
+    <style name="ThemeOverlay.WiFiTester.AlertDialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="shapeAppearanceOverlay">@style/ShapeAppearance.WiFiTester.Large</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/MaterialAlertDialog.WiFiTester.Title</item>
+    </style>
+
+    <style name="MaterialAlertDialog.WiFiTester.Title"
+        parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:textSize">@dimen/text_size_xl</item>
+    </style>
+
 </resources>

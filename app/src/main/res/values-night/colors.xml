@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+        Material 3 colour roles - dark scheme.
+        Selected automatically when the system is in dark mode or when the user
+        forces the dark theme in the settings screen.
+    -->
+
+    <!-- Primary -->
+    <color name="primary">#A8C7FA</color>
+    <color name="on_primary">#0A305F</color>
+    <color name="primary_container">#284777</color>
+    <color name="on_primary_container">#D3E3FD</color>
+
+    <!-- Secondary -->
+    <color name="secondary">#BFC6DC</color>
+    <color name="on_secondary">#293141</color>
+    <color name="secondary_container">#414759</color>
+    <color name="on_secondary_container">#DBE2F6</color>
+
+    <!-- Tertiary -->
+    <color name="tertiary">#D7BDE4</color>
+    <color name="on_tertiary">#3B2948</color>
+    <color name="tertiary_container">#523F5F</color>
+    <color name="on_tertiary_container">#F3D9FF</color>
+
+    <!-- Error -->
+    <color name="error">#F2B8B5</color>
+    <color name="on_error">#601410</color>
+    <color name="error_container">#8C1D18</color>
+    <color name="on_error_container">#F9DEDC</color>
+
+    <!-- Background / surface -->
+    <color name="background">#111318</color>
+    <color name="on_background">#E2E2E9</color>
+    <color name="surface">#111318</color>
+    <color name="on_surface">#E2E2E9</color>
+    <color name="surface_variant">#44474F</color>
+    <color name="on_surface_variant">#C4C6D0</color>
+    <color name="surface_inverse">#E2E2E9</color>
+    <color name="on_surface_inverse">#2F3033</color>
+    <color name="surface_dim">#111318</color>
+    <color name="surface_bright">#37393E</color>
+    <color name="surface_container_lowest">#0C0E13</color>
+    <color name="surface_container_low">#191C20</color>
+    <color name="surface_container">#1D2024</color>
+    <color name="surface_container_high">#282A2F</color>
+    <color name="surface_container_highest">#333539</color>
+
+    <!-- Outline -->
+    <color name="outline">#8E9099</color>
+    <color name="outline_variant">#44474F</color>
+
+    <!-- Status colours -->
+    <color name="success">#6DD58C</color>
+    <color name="on_success">#00391A</color>
+    <color name="success_container">#00522A</color>
+    <color name="on_success_container">#8AF8AB</color>
+    <color name="warning">#FFB870</color>
+    <color name="on_warning">#4A2800</color>
+    <color name="warning_container">#6A3B00</color>
+    <color name="on_warning_container">#FFDDB6</color>
+
+    <!-- Terminal surfaces -->
+    <color name="log_background">#0A0C10</color>
+    <color name="log_text">#C3D1E5</color>
+    <color name="log_accent">#78B8FF</color>
+    <color name="code_background">#1D2024</color>
+    <color name="code_text">#E2E2E9</color>
+    <color name="code_accent">#A8C7FA</color>
+
+    <color name="accent_light">#284777</color>
+</resources>

@@ -1,73 +1,100 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
-    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <uses-permission android:name="android.permission.VIBRATE" />
-
-    <uses-feature
-        android:name="android.hardware.wifi"
-        android:required="false" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.INTERNET" />
 
     <application
-        android:allowBackup="true"
-        android:icon="@drawable/icon"
-        android:label="@string/app_name"
+        android:name=".WiFiTesterApp"
         android:hardwareAccelerated="true"
-        android:usesCleartextTraffic="true">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:localeConfig="@xml/locales_config"
+        tools:targetApi="33"
+        android:theme="@style/Theme.WiFiTester"
+        android:supportsRtl="true">
 
+        <!-- Shell with the three primary workspaces and the bottom navigation. -->
         <activity
-            android:name="me.paranoid.wifikill.DashboardActivity"
+            android:name="me.paranoid.wifikill.MainActivity"
             android:exported="true"
-            android:label="@string/app_name"
-            android:theme="@android:style/Theme.Material.NoActionBar">
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.WiFiTester">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
 
+        <!-- Secondary screen opened from the network list. -->
+        <activity
+            android:name="me.paranoid.wifikill.NetworkDetailActivity"
+            android:exported="false"
+            android:label="@string/detail_title"
+            android:theme="@style/Theme.WiFiTester"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
+
+        <!-- Passive monitoring and capture. -->
         <activity
             android:name="me.paranoid.wifikill.MonitorModeActivity"
             android:exported="false"
-            android:label="监听模式"
-            android:theme="@android:style/Theme.Material.NoActionBar" />
+            android:label="@string/monitor_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
 
+        <!-- Active test workbench. -->
         <activity
-            android:name="me.paranoid.wifikill.SettingsActivity"
+            android:name="me.paranoid.wifikill.AttackActivity"
             android:exported="false"
-            android:label="WiFiTester 设置"
-            android:theme="@android:style/Theme.Material.NoActionBar" />
-
-
-
+            android:label="@string/attack_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
 
         <activity
             android:name="me.paranoid.wifikill.AircrackToolkitActivity"
             android:exported="false"
-            android:label="Aircrack-ng 工作台"
-            android:theme="@android:style/Theme.Material.NoActionBar" />
+            android:label="@string/toolkit_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
 
         <activity
             android:name="me.paranoid.wifikill.FrameAnalysisActivity"
             android:exported="false"
-            android:label="断开帧分析"
-            android:theme="@android:style/Theme.Material.NoActionBar" />
+            android:label="@string/frames_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
 
         <activity
             android:name="me.paranoid.wifikill.WiFiAuditActivity"
             android:exported="false"
-            android:label="Wi-Fi 网络信息"
-            android:theme="@android:style/Theme.Material.NoActionBar" />
+            android:label="@string/audit_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
 
+        <activity
+            android:name="me.paranoid.wifikill.AircrackNgActivity"
+            android:exported="false"
+            android:label="@string/inventory_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
+
+        <!--
+            Persists the per-app locale on Android 12 and below. On Android 13
+            and above the system locale manager takes over.
+        -->
+        <service
+            android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"
+            android:enabled="false"
+            android:exported="false">
+            <meta-data
+                android:name="autoStoreLocales"
+                android:value="true" />
+        </service>
     </application>
 </manifest>

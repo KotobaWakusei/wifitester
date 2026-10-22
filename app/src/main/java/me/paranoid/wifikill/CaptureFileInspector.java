@@ -10,10 +10,20 @@ final class CaptureFileInspector {
     enum Format {
         PCAP("PCAP"),
         PCAPNG("PCAPNG"),
-        UNKNOWN("未知或不支持的抓包格式");
+        UNKNOWN(null);
 
+        /** The technical name of the format, or {@code null} when unknown. */
         final String label;
         Format(String label) { this.label = label; }
+
+        /** The label to show to the user, resolved from the resources. */
+        String displayLabel(android.content.Context context) {
+            if (label != null) {
+                return label;
+            }
+            return context == null ? "unknown"
+                    : context.getString(R.string.capture_unknown_format);
+        }
     }
 
     private CaptureFileInspector() { }

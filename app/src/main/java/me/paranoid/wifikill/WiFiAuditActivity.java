@@ -1,7 +1,6 @@
 package me.paranoid.wifikill;
 
 import android.Manifest;
-import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -12,10 +11,11 @@ import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
 import android.view.View;
-import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+
+import com.google.android.material.button.MaterialButton;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -29,14 +29,14 @@ import java.util.Locale;
  * Read-only Wi-Fi security reconnaissance using Android's public scan API.
  * This screen does not inject frames, disconnect clients, or change router state.
  */
-public final class WiFiAuditActivity extends Activity {
+public final class WiFiAuditActivity extends BaseActivity {
     private static final int REQUEST_SCAN_PERMISSIONS = 70;
 
     private WifiManager wifiManager;
     private TextView statusView;
     private TextView resultsView;
-    private Button scanButton;
-    private Button exportButton;
+    private MaterialButton scanButton;
+    private MaterialButton exportButton;
     private final List<ScanResult> latestResults = new ArrayList<>();
     private boolean receiverRegistered;
 
@@ -50,8 +50,8 @@ public final class WiFiAuditActivity extends Activity {
             boolean updated = intent.getBooleanExtra(
                     WifiManager.EXTRA_RESULTS_UPDATED, false);
             renderResults(updated
-                    ? "扫描结果已更新。"
-                    : "无法刷新扫描结果，正在显示缓存数据。");
+                    ? getString(R.string.audit_updated)
+                    : getString(R.string.audit_refresh_failed));
         }
     };
 
@@ -61,10 +61,10 @@ public final class WiFiAuditActivity extends Activity {
         wifiManager = (WifiManager) getApplicationContext()
                 .getSystemService(Context.WIFI_SERVICE);
         buildContentView();
-        setTitle("Wi-Fi 网络信息");
+        setTitle(R.string.audit_title);
 
         if (hasScanPermissions()) {
-            renderResults("只读扫描 Wi-Fi 网络，不会修改网络配置。");
+            renderResults(getString(R.string.audit_readonly_note));
         } else {
             requestScanPermissions();
         }
@@ -74,23 +74,22 @@ public final class WiFiAuditActivity extends Activity {
         int padding = dp(16);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xff0b1020);
+        root.setBackgroundColor(UiKit.color(this, R.attr.colorSurface));
         root.setPadding(padding, padding, padding, padding);
 
         TextView heading = new TextView(this);
-        heading.setText("附近的 Wi-Fi 网络");
+        heading.setText(getString(R.string.audit_heading));
         heading.setTextSize(24);
-        heading.setTextColor(0xffffffff);
+        heading.setTextColor(UiKit.color(this, R.attr.colorOnSurface));
         heading.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         root.addView(heading, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT));
 
         TextView explanation = new TextView(this);
-        explanation.setText("以下信息由 Android 提供。扫描结果可能受定位权限、系统设置"
-                + "和系统扫描频率限制影响。");
+        explanation.setText(getString(R.string.audit_explanation));
         explanation.setTextSize(14);
-        explanation.setTextColor(0xffa8b5ca);
+        explanation.setTextColor(UiKit.color(this, R.attr.colorOnSurfaceVariant));
         LinearLayout.LayoutParams explanationParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -99,9 +98,9 @@ public final class WiFiAuditActivity extends Activity {
 
         statusView = new TextView(this);
         statusView.setTextSize(14);
-        statusView.setTextColor(0xffc3d1e5);
+        statusView.setTextColor(UiKit.color(this, R.attr.colorOnSurface));
         statusView.setPadding(dp(12),dp(12),dp(12),dp(12));
-        statusView.setBackgroundColor(0xff151f33);
+        statusView.setBackgroundColor(UiKit.color(this, R.attr.colorSurfaceContainer));
         LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -110,11 +109,7 @@ public final class WiFiAuditActivity extends Activity {
 
         LinearLayout actions = new LinearLayout(this);
         actions.setOrientation(LinearLayout.HORIZONTAL);
-        scanButton = new Button(this);
-        scanButton.setText("扫描 / 刷新");
-        scanButton.setAllCaps(false);
-        scanButton.setTextColor(0xffffffff);
-        scanButton.setBackground(roundButton(0xff315d91));
+        scanButton = UiKit.primary(this, getString(R.string.audit_scan));
         scanButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
@@ -124,11 +119,7 @@ public final class WiFiAuditActivity extends Activity {
         actions.addView(scanButton, new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
 
-        exportButton = new Button(this);
-        exportButton.setText("导出报告");
-        exportButton.setAllCaps(false);
-        exportButton.setTextColor(0xffffffff);
-        exportButton.setBackground(roundButton(0xff263a56));
+        exportButton = UiKit.tonal(this, getString(R.string.audit_export));
         exportButton.setEnabled(false);
         exportButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -141,12 +132,7 @@ public final class WiFiAuditActivity extends Activity {
         root.addView(actions);
 
         ScrollView scroll = new ScrollView(this);
-        resultsView = new TextView(this);
-        resultsView.setTextSize(14);
-        resultsView.setTextColor(0xffdce6f5);
-        resultsView.setTextIsSelectable(true);
-        resultsView.setPadding(dp(12), dp(12), dp(12), dp(12));
-        resultsView.setBackgroundColor(0xff101827);
+        resultsView = UiKit.resultView(this);
         scroll.addView(resultsView, new ScrollView.LayoutParams(
                 ScrollView.LayoutParams.MATCH_PARENT,
                 ScrollView.LayoutParams.WRAP_CONTENT));
@@ -185,7 +171,7 @@ public final class WiFiAuditActivity extends Activity {
 
     private void requestScanPermissions() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
-            renderResults("当前 Android 版本无法检查 Wi-Fi 扫描权限。");
+            renderResults(getString(R.string.audit_permission_check_unsupported));
             return;
         }
         List<String> permissions = new ArrayList<>();
@@ -194,7 +180,7 @@ public final class WiFiAuditActivity extends Activity {
             permissions.add(Manifest.permission.ACCESS_FINE_LOCATION);
         }
         if (permissions.isEmpty()) {
-            renderResults("所需权限已具备。");
+            renderResults(getString(R.string.audit_permission_ready));
             return;
         }
         requestPermissions(permissions.toArray(new String[0]), REQUEST_SCAN_PERMISSIONS);
@@ -210,8 +196,8 @@ public final class WiFiAuditActivity extends Activity {
         if (hasScanPermissions()) {
             startWifiScan();
         } else {
-            statusView.setText("Wi-Fi 扫描权限被拒绝。你仍可使用主界面的"
-                    + "设备信息导出功能。");
+            statusView.setText(getString(R.string.audit_permission_denied)
+                    + getString(R.string.audit_permission_hint_export));
             resultsView.setText("");
             exportButton.setEnabled(false);
         }
@@ -222,7 +208,7 @@ public final class WiFiAuditActivity extends Activity {
         super.onResume();
         registerScanReceiver();
         if (hasScanPermissions()) {
-            renderResults("正在显示 Android 提供的最新扫描结果。");
+            renderResults(getString(R.string.audit_showing_latest));
         }
     }
 
@@ -258,33 +244,33 @@ public final class WiFiAuditActivity extends Activity {
             return;
         }
         if (wifiManager == null) {
-            renderResults("此设备未提供 Wi-Fi 系统服务。");
+            renderResults(getString(R.string.audit_no_service));
             return;
         }
         if (!wifiManager.isWifiEnabled()) {
-            renderResults("Wi-Fi 已关闭。请在 Android 设置中启用后重试。");
+            renderResults(getString(R.string.audit_wifi_off));
             return;
         }
         try {
             boolean started = wifiManager.startScan();
             if (started) {
-                statusView.setText("已请求扫描，正在等待 Android 返回结果…");
+                statusView.setText(getString(R.string.audit_requesting));
             } else {
-                renderResults("Android 限制了本次扫描频率，正在显示缓存结果。");
+                renderResults(getString(R.string.audit_throttled));
             }
         } catch (SecurityException permissionError) {
-            statusView.setText("Android 拒绝了扫描访问。请检查定位和附近设备"
-                    + "权限，以及系统定位开关。");
+            statusView.setText(getString(R.string.audit_denied,
+                    getString(R.string.audit_permission_hint)));
         } catch (RuntimeException scanError) {
-            statusView.setText("无法发起扫描："
-                    + safeValue(scanError.getMessage()));
+            statusView.setText(getString(R.string.audit_scan_failed,
+                    safeValue(scanError.getMessage())));
         }
     }
 
     private void renderResults(String statusPrefix) {
         if (wifiManager == null || !hasScanPermissions()) {
             latestResults.clear();
-            resultsView.setText("授予 Wi-Fi 扫描所需权限前，无法读取扫描数据。");
+            resultsView.setText(getString(R.string.audit_no_data));
             exportButton.setEnabled(false);
             if (statusView != null) {
                 statusView.setText(statusPrefix);
@@ -300,7 +286,7 @@ public final class WiFiAuditActivity extends Activity {
             }
         } catch (SecurityException permissionError) {
             latestResults.clear();
-            resultsView.setText("Android 拒绝访问扫描结果。");
+            resultsView.setText(getString(R.string.audit_results_denied));
             exportButton.setEnabled(false);
             statusView.setText(statusPrefix);
             return;
@@ -315,8 +301,8 @@ public final class WiFiAuditActivity extends Activity {
 
         StringBuilder text = new StringBuilder();
         if (latestResults.isEmpty()) {
-            text.append("当前扫描缓存中没有可用的接入点。\n")
-                    .append("点击“扫描 / 刷新”，并检查 Android 定位权限和系统定位开关。");
+            text.append(getString(R.string.audit_no_access_points))
+                    .append(getString(R.string.audit_permission_help));
         } else {
             for (int index = 0; index < latestResults.size(); index++) {
                 ScanResult result = latestResults.get(index);
@@ -324,36 +310,35 @@ public final class WiFiAuditActivity extends Activity {
                 String security = classifySecurity(capabilities);
                 text.append(index + 1).append(". ")
                         .append(result.SSID == null || result.SSID.isEmpty()
-                                ? "<隐藏的 SSID>" : safeValue(result.SSID))
+                                ? getString(R.string.audit_hidden_ssid) : safeValue(result.SSID))
                         .append("\n");
                 text.append("   BSSID：").append(safeValue(result.BSSID)).append("\n");
-                text.append("   安全类型：").append(security).append("\n");
-                text.append("   信号强度：").append(result.level).append(" dBm  |  ")
-                        .append(bandForFrequency(result.frequency)).append("  |  频道 ")
+                text.append(getString(R.string.audit_row_security)).append(security).append("\n");
+                text.append(getString(R.string.audit_row_signal)).append(result.level).append(" dBm  |  ")
+                        .append(bandForFrequency(result.frequency)).append("  |  ")
                         .append(channelForFrequency(result.frequency)).append("\n");
-                text.append("   能力信息：").append(safeValue(capabilities)).append("\n");
-                if ("开放网络".equals(security) || "WEP（旧式加密）".equals(security)) {
-                    text.append("   提示：链路层保护较弱或未加密，请确认"
-                            + "该网络是否为公开网络。\n");
+                text.append(getString(R.string.audit_row_capabilities)).append(safeValue(capabilities)).append("\n");
+                if (getString(R.string.audit_open).equals(security) || getString(R.string.audit_wep_legacy).equals(security)) {
+                    text.append(getString(R.string.audit_weak_hint));
                 }
                 text.append("\n");
             }
         }
         resultsView.setText(text.toString());
-        statusView.setText(statusPrefix + "\n发现的网络数量：" + latestResults.size());
+        statusView.setText(statusPrefix + getString(R.string.audit_count, latestResults.size()));
         exportButton.setEnabled(!latestResults.isEmpty());
     }
 
-    private static String classifySecurity(String capabilities) {
+    private String classifySecurity(String capabilities) {
         String value = WifiScanParser.classifySecurity(capabilities);
         switch (value) {
-            case "Enhanced Open (OWE)": return "增强型开放网络（OWE）";
-            case "WPA3": return "WPA3";
-            case "WPA2": return "WPA2";
-            case "WPA (legacy)": return "WPA（旧式加密）";
-            case "WEP (legacy)": return "WEP（旧式加密）";
-            case "Open": return "开放网络";
-            default: return "未知";
+            case "Enhanced Open (OWE)": return getString(R.string.audit_owe);
+            case "WPA3": return getString(R.string.security_wpa3);
+            case "WPA2": return getString(R.string.security_wpa2);
+            case "WPA (legacy)": return getString(R.string.audit_wpa_legacy);
+            case "WEP (legacy)": return getString(R.string.audit_wep_legacy);
+            case "Open": return getString(R.string.audit_open);
+            default: return getString(R.string.audit_unknown);
         }
     }
 
@@ -367,33 +352,33 @@ public final class WiFiAuditActivity extends Activity {
 
     private void exportReport() {
         if (latestResults.isEmpty()) {
-            statusView.setText("没有可导出的扫描结果。");
+            statusView.setText(getString(R.string.audit_no_export));
             return;
         }
         StringBuilder report = new StringBuilder();
-        report.append("Wi-Fi 网络安全信息\n");
-        report.append("生成时间：").append(new SimpleDateFormat(
+        report.append(getString(R.string.audit_report_title));
+        report.append(getString(R.string.audit_report_time)).append(new SimpleDateFormat(
                 "yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date())).append("\n");
-        report.append("Android 版本：").append(safeValue(Build.VERSION.RELEASE))
+        report.append(getString(R.string.audit_report_android)).append(safeValue(Build.VERSION.RELEASE))
                 .append(" (SDK ").append(Build.VERSION.SDK_INT).append(")\n");
-        report.append("可见网络数量：").append(latestResults.size()).append("\n\n");
+        report.append(getString(R.string.audit_report_count, latestResults.size()));
         for (ScanResult result : latestResults) {
             String capabilities = result.capabilities == null ? "" : result.capabilities;
-            report.append("网络名称（SSID）：").append(result.SSID == null || result.SSID.isEmpty()
-                    ? "<隐藏的 SSID>" : safeValue(result.SSID)).append("\n");
-            report.append("B网络名称（SSID）：").append(safeValue(result.BSSID)).append("\n");
-            report.append("安全类型：").append(classifySecurity(capabilities)).append("\n");
-            report.append("信号强度：").append(result.level).append(" dBm\n");
-            report.append("频率：").append(result.frequency).append(" MHz\n");
-            report.append("频道：").append(channelForFrequency(result.frequency)).append("\n");
-            report.append("能力信息：").append(safeValue(capabilities)).append("\n\n");
+            report.append(getString(R.string.audit_report_ssid)).append(result.SSID == null || result.SSID.isEmpty()
+                    ? getString(R.string.audit_hidden_ssid) : safeValue(result.SSID)).append("\n");
+            report.append("BSSID：").append(safeValue(result.BSSID)).append("\n");
+            report.append(getString(R.string.audit_report_security)).append(classifySecurity(capabilities)).append("\n");
+            report.append(getString(R.string.audit_report_signal)).append(result.level).append(" dBm\n");
+            report.append(getString(R.string.audit_report_frequency)).append(result.frequency).append(" MHz\n");
+            report.append(getString(R.string.audit_report_channel)).append(channelForFrequency(result.frequency)).append("\n");
+            report.append(getString(R.string.audit_report_capabilities)).append(safeValue(capabilities)).append("\n\n");
         }
 
         Intent shareIntent = new Intent(Intent.ACTION_SEND);
         shareIntent.setType("text/plain");
-        shareIntent.putExtra(Intent.EXTRA_SUBJECT, "Wi-Fi 网络安全信息");
+        shareIntent.putExtra(Intent.EXTRA_SUBJECT, getString(R.string.audit_share_subject));
         shareIntent.putExtra(Intent.EXTRA_TEXT, report.toString());
-        startActivity(Intent.createChooser(shareIntent, "导出 Wi-Fi 报告"));
+        startActivity(Intent.createChooser(shareIntent, getString(R.string.audit_share_chooser)));
     }
 
     private static String safeValue(String value) {

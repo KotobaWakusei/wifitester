@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Container that hosts the currently selected tab fragment. -->
+    <item name="tab_container" type="id" />
+</resources>

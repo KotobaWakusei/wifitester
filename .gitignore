@@ -10,3 +10,12 @@ local.properties
 captures/
 *.pcap
 *.pcapng
+
+# Native toolchain binaries produced by tools/build-android-toolchain.sh.
+# They are rebuilt by CI and must not be committed.
+/app/src/main/assets/toolchain/
+
+# Release signing material
+keystore.properties
+*.jks
+*.keystore

@@ -1,5 +1,7 @@
 package me.paranoid.wifikill;
 
+import android.content.Context;
+
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -9,24 +11,28 @@ import java.util.Map;
 final class ToolCatalog {
     private static final String MARKER = "WIFITESTER_TOOL";
     private static final String[] NAMES = {
-            "aircrack-ng", "airodump-ng", "airmon-ng", "tcpdump",
-            "iw", "ip", "capinfos", "tshark"
+            "aircrack-ng", "airodump-ng", "aireplay-ng", "airmon-ng", "tcpdump",
+            "iw", "ip", "capinfos", "tshark", "hostapd", "arpspoof"
     };
-    private static final String[] PURPOSES = {
-            "离线抓包审计；本应用不会自动发起口令尝试",
-            "被动无线捕获；能力依赖驱动与接口",
-            "监听接口辅助；不替代驱动能力验证",
-            "被动捕获与 PCAP 读取",
-            "无线接口、模式与频道管理",
-            "网络接口状态管理",
-            "抓包元数据检查",
-            "抓包协议与流量统计"
+    private static final int[] PURPOSE_RES = {
+            R.string.tool_purpose_aircrack,
+            R.string.tool_purpose_airodump,
+            R.string.tool_purpose_aireplay,
+            R.string.tool_purpose_airmon,
+            R.string.tool_purpose_tcpdump,
+            R.string.tool_purpose_iw,
+            R.string.tool_purpose_ip,
+            R.string.tool_purpose_capinfos,
+            R.string.tool_purpose_tshark,
+            R.string.tool_purpose_hostapd,
+            R.string.tool_purpose_arpspoof
     };
 
     private ToolCatalog() { }
 
     static String probeCommand() {
-        return "for t in aircrack-ng airodump-ng airmon-ng tcpdump iw ip capinfos tshark; do " +
+        return "for t in aircrack-ng airodump-ng aireplay-ng airmon-ng tcpdump iw ip " +
+                "capinfos tshark hostapd arpspoof; do " +
                 "p=$(command -v \"$t\" 2>/dev/null || true); " +
                 "if [ -z \"$p\" ]; then " +
                 "for q in /data/data/com.termux/files/usr/bin/\"$t\" /system/bin/\"$t\" " +
@@ -50,24 +56,35 @@ final class ToolCatalog {
         ArrayList<Tool> result = new ArrayList<>();
         for (int i = 0; i < NAMES.length; i++) {
             String name = NAMES[i];
-            result.add(new Tool(name, PURPOSES[i], paths.get(name)));
+            result.add(new Tool(name, PURPOSE_RES[i], paths.get(name)));
         }
         return result;
     }
 
-    static String format(String output) {
+    /**
+     * Renders the inventory report.
+     *
+     * @param context used to resolve the localized labels
+     * @param output  the raw output of {@link #probeCommand()}
+     */
+    static String format(Context context, String output) {
         StringBuilder result = new StringBuilder();
         for (Tool tool : parse(output)) {
             if (result.length() > 0) result.append('\n');
             result.append(tool.name).append("  ")
-                    .append(tool.isAvailable() ? "✓ 已找到" : "× 未找到")
-                    .append("\n    ").append(tool.purpose);
+                    .append(tool.isAvailable()
+                            ? context.getString(R.string.tool_found)
+                            : context.getString(R.string.tool_missing))
+                    .append("\n    ").append(context.getString(tool.purposeRes));
             if (tool.isAvailable()) {
                 String path = tool.path;
-                String origin = path.contains("/files/toolchain/bin/") ? "APK 内置"
-                        : path.contains("/com.termux/") ? "Termux/第三方"
-                        : "系统或外部工具";
-                result.append("\n    路径：").append(path).append("（").append(origin).append("）");
+                String origin = path.contains("/files/toolchain/bin/")
+                        ? context.getString(R.string.tool_origin_bundled)
+                        : path.contains("/com.termux/")
+                        ? context.getString(R.string.tool_origin_termux)
+                        : context.getString(R.string.tool_origin_system);
+                result.append("\n    ").append(context.getString(R.string.tool_path_label))
+                        .append(path).append("(").append(origin).append(")");
             }
         }
         return result.toString();
@@ -80,12 +97,12 @@ final class ToolCatalog {
 
     static final class Tool {
         final String name;
-        final String purpose;
+        final int purposeRes;
         final String path;
 
-        Tool(String name, String purpose, String path) {
+        Tool(String name, int purposeRes, String path) {
             this.name = name;
-            this.purpose = purpose;
+            this.purposeRes = purposeRes;
             this.path = path;
         }
 

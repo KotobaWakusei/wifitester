@@ -40,6 +40,8 @@ public final class MainActivity extends BaseActivity {
     private FrameLayout container;
     private BottomNavigationView navigation;
     private int selectedTab = 0;
+    /** Guards the tab transaction against the re-entrant selection listener. */
+    private boolean rendering;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -59,15 +61,20 @@ public final class MainActivity extends BaseActivity {
         shell.addView(container, new LinearLayout.LayoutParams(-1, 0, 1));
 
         navigation = new BottomNavigationView(this);
+        navigation.setId(R.id.bottom_navigation);
         navigation.inflateMenu(R.menu.bottom_nav_menu);
-        navigation.setBackgroundColor(UiKit.color(this, R.attr.colorSurfaceContainer));
         navigation.setOnItemSelectedListener(item -> {
             int index = indexOfTab(item.getItemId());
-            if (index >= 0) {
-                selectTab(index, true);
-                return true;
+            if (index < 0) {
+                return false;
             }
-            return false;
+            // The navigation bar is the single source of truth: the listener
+            // only updates the tab, it must not call setSelectedItemId()
+            // again because that would call the listener a second time.
+            selectedTab = index;
+            renderTabs(true);
+            animateSelectedNavigation();
+            return true;
         });
         navigation.setLabelVisibilityMode(BottomNavigationView.LABEL_VISIBILITY_LABELED);
         shell.addView(navigation, new LinearLayout.LayoutParams(-1, dp(80)));
@@ -88,16 +95,33 @@ public final class MainActivity extends BaseActivity {
         return -1;
     }
 
-    /** Switches the visible tab, keeping the other tabs alive but hidden. */
+    private static int itemIdOfTab(int tab) {
+        if (tab == 1) {
+            return R.id.tab_tools;
+        }
+        if (tab == 2) {
+            return R.id.tab_settings;
+        }
+        return R.id.tab_wifi;
+    }
+
+    /**
+     * Switches the visible tab, keeping the other tabs alive but hidden.
+     *
+     * <p>The navigation bar reports the selection through its listener, so
+     * this method only moves the selection when the caller is not the bar
+     * itself. Otherwise the listener and {@code setSelectedItemId()} would
+     * call each other without end.</p>
+     */
     public void selectTab(int tab, boolean animate) {
         int target = clampTab(tab);
         boolean changed = target != selectedTab;
         selectedTab = target;
-        if (navigation != null) {
-            int itemId = target == 0 ? R.id.tab_wifi : (target == 1 ? R.id.tab_tools : R.id.tab_settings);
-            if (navigation.getSelectedItemId() != itemId) {
-                navigation.setSelectedItemId(itemId);
-            }
+        if (navigation != null && navigation.getSelectedItemId() != itemIdOfTab(target)) {
+            // The listener renders the tabs as soon as the bar changed its
+            // selection, so nothing has to be rendered a second time here.
+            navigation.setSelectedItemId(itemIdOfTab(target));
+            return;
         }
         renderTabs(animate && changed);
         if (changed && animate) {
@@ -107,9 +131,13 @@ public final class MainActivity extends BaseActivity {
 
     private void renderTabs(boolean animate) {
         FragmentManager manager = getSupportFragmentManager();
-        if (manager == null) {
+        if (manager == null || rendering) {
+            // setSelectedItemId() calls the selection listener synchronously,
+            // which re-enters this method. The outer call renders the tabs
+            // with the current selection, so the nested one has to stop.
             return;
         }
+        rendering = true;
         FragmentTransaction transaction = manager.beginTransaction();
         for (int i = 0; i < TAB_TAGS.length; i++) {
             Fragment fragment = manager.findFragmentByTag(TAB_TAGS[i]);
@@ -131,6 +159,7 @@ public final class MainActivity extends BaseActivity {
             }
         }
         transaction.commitAllowingStateLoss();
+        rendering = false;
         if (animate) {
             animatePageIn();
         }

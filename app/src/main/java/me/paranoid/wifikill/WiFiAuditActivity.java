@@ -74,13 +74,13 @@ public final class WiFiAuditActivity extends BaseActivity {
         int padding = dp(16);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(UiKit.color(this, R.attr.colorSurface));
+        root.setBackgroundColor(UiKit.color(this, Attrs.COLOR_SURFACE));
         root.setPadding(padding, padding, padding, padding);
 
         TextView heading = new TextView(this);
         heading.setText(getString(R.string.audit_heading));
         heading.setTextSize(24);
-        heading.setTextColor(UiKit.color(this, R.attr.colorOnSurface));
+        heading.setTextColor(UiKit.color(this, Attrs.COLOR_ON_SURFACE));
         heading.setTypeface(android.graphics.Typeface.DEFAULT, android.graphics.Typeface.BOLD);
         root.addView(heading, new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
@@ -89,7 +89,7 @@ public final class WiFiAuditActivity extends BaseActivity {
         TextView explanation = new TextView(this);
         explanation.setText(getString(R.string.audit_explanation));
         explanation.setTextSize(14);
-        explanation.setTextColor(UiKit.color(this, R.attr.colorOnSurfaceVariant));
+        explanation.setTextColor(UiKit.color(this, Attrs.COLOR_ON_SURFACE_VARIANT));
         LinearLayout.LayoutParams explanationParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -98,9 +98,9 @@ public final class WiFiAuditActivity extends BaseActivity {
 
         statusView = new TextView(this);
         statusView.setTextSize(14);
-        statusView.setTextColor(UiKit.color(this, R.attr.colorOnSurface));
+        statusView.setTextColor(UiKit.color(this, Attrs.COLOR_ON_SURFACE));
         statusView.setPadding(dp(12),dp(12),dp(12),dp(12));
-        statusView.setBackgroundColor(UiKit.color(this, R.attr.colorSurfaceContainer));
+        statusView.setBackgroundColor(UiKit.color(this, Attrs.COLOR_SURFACE_CONTAINER));
         LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT);

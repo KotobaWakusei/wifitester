@@ -29,8 +29,8 @@ public final class AircrackNgActivity extends BaseActivity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(UiKit.color(this, R.attr.colorSurface));
-        getWindow().setNavigationBarColor(UiKit.color(this, R.attr.colorSurface));
+        getWindow().setStatusBarColor(UiKit.color(this, Attrs.COLOR_SURFACE));
+        getWindow().setNavigationBarColor(UiKit.color(this, Attrs.COLOR_SURFACE));
 
         ScrollView scroll = UiKit.createPage(this);
         LinearLayout root = (LinearLayout) scroll.getChildAt(0);
@@ -78,7 +78,7 @@ public final class AircrackNgActivity extends BaseActivity {
         TextView desc = UiKit.text(this, description, 11, UiKit.MUTED_DARK, false);
         row.addView(desc, UiKit.top(3, this));
         row.setOnClickListener(v -> runCommand(command));
-        row.setBackground(UiKit.round(UiKit.color(this, R.attr.colorSurfaceContainer), UiKit.dp(this, 12)));
+        row.setBackground(UiKit.round(UiKit.color(this, Attrs.COLOR_SURFACE_CONTAINER), UiKit.dp(this, 12)));
         row.setPadding(UiKit.dp(this, 12), UiKit.dp(this, 10), UiKit.dp(this, 12), UiKit.dp(this, 10));
         parent.addView(row);
     }

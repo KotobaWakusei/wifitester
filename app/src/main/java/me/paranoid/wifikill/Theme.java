@@ -26,7 +26,7 @@ final class Theme {
      * Resolves a colour attribute of the current theme.
      *
      * @param context any context that carries the application theme
-     * @param attr    the attribute to resolve, e.g. {@code R.attr.colorPrimary}
+     * @param attr    the attribute to resolve, e.g. {@code Attrs.COLOR_PRIMARY}
      * @return the resolved colour, or {@link Color#GRAY} when the attribute is
      *         not part of the theme
      */
@@ -56,7 +56,7 @@ final class Theme {
     /** Blends a colour towards the theme background, used for subtle fills. */
     @ColorInt
     static int blend(Context context, @ColorInt int color, float amount) {
-        int background = color(context, R.attr.colorSurface, Color.WHITE);
+        int background = color(context, Attrs.COLOR_SURFACE, Color.WHITE);
         return ColorUtils.blendARGB(color, background, Math.max(0f, Math.min(1f, amount)));
     }
 }

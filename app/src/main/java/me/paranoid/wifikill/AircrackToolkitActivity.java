@@ -31,8 +31,8 @@ public final class AircrackToolkitActivity extends BaseActivity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(UiKit.color(this, R.attr.colorSurface));
-        getWindow().setNavigationBarColor(UiKit.color(this, R.attr.colorSurface));
+        getWindow().setStatusBarColor(UiKit.color(this, Attrs.COLOR_SURFACE));
+        getWindow().setNavigationBarColor(UiKit.color(this, Attrs.COLOR_SURFACE));
 
         buildUi();
         detectTools();

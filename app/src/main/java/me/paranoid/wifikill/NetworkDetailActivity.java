@@ -44,8 +44,8 @@ public final class NetworkDetailActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        getWindow().setStatusBarColor(UiKit.color(this, R.attr.colorSurface));
-        getWindow().setNavigationBarColor(UiKit.color(this, R.attr.colorSurface));
+        getWindow().setStatusBarColor(UiKit.color(this, Attrs.COLOR_SURFACE));
+        getWindow().setNavigationBarColor(UiKit.color(this, Attrs.COLOR_SURFACE));
 
         Intent intent = getIntent();
         entry = new NetworkEntry(

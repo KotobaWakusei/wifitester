@@ -62,6 +62,11 @@
         <item name="colorCodeText">@color/code_text</item>
         <item name="colorCodeAccent">@color/code_accent</item>
 
+        <!-- Platform widgets (spinner, edit fields) follow the scheme too. -->
+        <item name="android:textColorPrimary">?attr/colorOnSurface</item>
+        <item name="android:textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="android:textColorHint">?attr/colorOnSurfaceVariant</item>
+
         <!-- System bars follow the page background. -->
         <item name="android:statusBarColor">@color/background</item>
         <item name="android:navigationBarColor">@color/background</item>
@@ -153,7 +158,6 @@
 
     <!-- Bottom navigation -->
     <style name="Widget.WiFiTester.BottomNavigation" parent="Widget.Material3.BottomNavigationView">
-        <item name="android:background">@color/surface_container</item>
         <item name="itemActiveIndicatorStyle">@style/Widget.WiFiTester.BottomNavigation.ActiveIndicator</item>
         <item name="labelVisibilityMode">labeled</item>
     </style>

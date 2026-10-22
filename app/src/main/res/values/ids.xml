@@ -2,4 +2,6 @@
 <resources>
     <!-- Container that hosts the currently selected tab fragment. -->
     <item name="tab_container" type="id" />
+    <!-- The bottom navigation of the application shell. -->
+    <item name="bottom_navigation" type="id" />
 </resources>

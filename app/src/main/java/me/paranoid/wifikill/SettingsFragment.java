@@ -59,18 +59,14 @@ public final class SettingsFragment extends Fragment {
         card.addView(LightKit.text(getActivity(), getString(R.string.settings_theme), 13, LightKit.MUTED, false),
                 LightKit.top(getActivity(), 10));
         addOptions(card, AppConfig.THEME_MODES, themeLabels(), AppConfig::themeMode,
-                (mode) -> {
-                    AppConfig.setThemeMode(host(), mode);
-                    AppConfig.applyTheme(host());
-                });
+                (mode) -> AppConfig.setThemeMode(host(), mode),
+                () -> AppConfig.applyTheme(host()));
 
         card.addView(LightKit.text(getActivity(), getString(R.string.settings_language), 13, LightKit.MUTED, false),
                 LightKit.top(getActivity(), 14));
         addOptions(card, AppConfig.LANGUAGES, languageLabels(), AppConfig::language,
-                (language) -> {
-                    AppConfig.setLanguage(host(), language);
-                    AppConfig.applyLanguage(host());
-                });
+                (language) -> AppConfig.setLanguage(host(), language),
+                () -> AppConfig.applyLanguage(host()));
         card.addView(LightKit.text(getActivity(),
                 getString(R.string.settings_appearance_detail),
                 12, LightKit.MUTED, false), LightKit.top(getActivity(), 10));
@@ -102,10 +98,12 @@ public final class SettingsFragment extends Fragment {
      * @param values  the stored values
      * @param labels  the display names of the values
      * @param current reads the currently active value
-     * @param onPick  invoked with the newly picked value
+     * @param persist stores the picked value
+     * @param apply   applies the new value; this may recreate the activity and
+     *                therefore has to run after the row was repainted
      */
     private void addOptions(LinearLayout parent, String[] values, String[] labels,
-                             CurrentProvider current, ChoiceListener onPick) {
+                            CurrentProvider current, ChoiceListener persist, Runnable apply) {
         LinearLayout row = new LinearLayout(getActivity());
         row.setOrientation(LinearLayout.HORIZONTAL);
         for (int i = 0; i < values.length; i++) {
@@ -119,11 +117,15 @@ public final class SettingsFragment extends Fragment {
             row.addView(choice, params);
             styleChoice(choice, current, value);
             choice.setOnClickListener(v -> {
-                onPick.onPick(value);
+                // Store first, repaint second and apply last: applying a new
+                // theme or locale recreates the activity, after which the
+                // views of this row must not be touched any more.
+                persist.onPick(value);
                 for (int j = 0; j < row.getChildCount(); j++) {
                     TextView sibling = (TextView) row.getChildAt(j);
                     styleChoice(sibling, current, values[j]);
                 }
+                apply.run();
             });
         }
         parent.addView(row, LightKit.top(getActivity(), 7));
@@ -166,7 +168,11 @@ public final class SettingsFragment extends Fragment {
         }
         addOptions(parent, stored, labels,
                 context -> String.valueOf(SettingsStore.prefs(context).getInt(key, defaultValue)),
-                value -> SettingsStore.prefs(host()).edit().putInt(key, Integer.parseInt(value)).apply());
+                value -> SettingsStore.prefs(host()).edit().putInt(key, Integer.parseInt(value)).apply(),
+                () -> {
+                    // The capture defaults only change the stored value, the
+                    // workbenches read them when they start.
+                });
     }
 
     // ---- root -------------------------------------------------------------
@@ -322,7 +328,7 @@ public final class SettingsFragment extends Fragment {
         LinearLayout card = LightKit.card(getActivity());
         card.addView(LightKit.text(getActivity(), getString(R.string.settings_about), 16, LightKit.INK, true));
         card.addView(LightKit.text(getActivity(),
-                getString(R.string.settings_about_version, "2.5.0"), 13, LightKit.MUTED, false),
+                getString(R.string.settings_about_version, "2.5.1"), 13, LightKit.MUTED, false),
                 LightKit.top(getActivity(), 6));
         card.addView(LightKit.text(getActivity(),
                 getString(R.string.settings_about_note),

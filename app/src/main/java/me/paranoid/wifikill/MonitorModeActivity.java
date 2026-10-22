@@ -54,11 +54,11 @@ public final class MonitorModeActivity extends BaseActivity {
 
     @Override protected void onCreate(Bundle state){
         super.onCreate(state);
-        BG=UiKit.color(this,R.attr.colorSurface);
-        PANEL=UiKit.color(this,R.attr.colorSurfaceContainerLowest);
-        INK=UiKit.color(this,R.attr.colorOnSurface);
-        ACCENT=UiKit.color(this,R.attr.colorPrimary);
-        MUTED=UiKit.color(this,R.attr.colorOnSurfaceVariant);
+        BG=UiKit.color(this,Attrs.COLOR_SURFACE);
+        PANEL=UiKit.color(this,Attrs.COLOR_SURFACE_CONTAINER_LOWEST);
+        INK=UiKit.color(this,Attrs.COLOR_ON_SURFACE);
+        ACCENT=UiKit.color(this,Attrs.COLOR_PRIMARY);
+        MUTED=UiKit.color(this,Attrs.COLOR_ON_SURFACE_VARIANT);
         buildUi();probe();
     }
 
@@ -438,7 +438,7 @@ public final class MonitorModeActivity extends BaseActivity {
     }
     private String trim(String s,int max){if(s==null)return "";return s.length()<=max?s:getString(R.string.monitor_output_truncated)+s.substring(s.length()-max);}
     private void toast(String s){Toast.makeText(this,s,Toast.LENGTH_LONG).show();}
-    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(16),dp(16),dp(16),dp(16));GradientDrawable bg=round(PANEL,dp(20));bg.setStroke(dp(1),UiKit.color(this,R.attr.colorOutlineVariant));l.setBackground(bg);l.setElevation(0f);return l;}
+    private LinearLayout card(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);l.setPadding(dp(16),dp(16),dp(16),dp(16));GradientDrawable bg=round(PANEL,dp(20));bg.setStroke(dp(1),UiKit.color(this,Attrs.COLOR_OUTLINE_VARIANT));l.setBackground(bg);l.setElevation(0f);return l;}
     private TextView text(String s,int size,int color,boolean bold){TextView t=new TextView(this);t.setText(s);t.setTextSize(size);t.setTextColor(color);if(bold)t.setTypeface(Typeface.DEFAULT,Typeface.BOLD);return t;}
     private MaterialButton primaryButton(String s){return UiKit.primary(this,s);}
     private MaterialButton tonalButton(String s){return UiKit.tonal(this,s);}

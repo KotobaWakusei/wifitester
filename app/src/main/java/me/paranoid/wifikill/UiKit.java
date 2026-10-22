@@ -17,6 +17,7 @@ import android.widget.TextView;
 
 import androidx.annotation.AttrRes;
 import androidx.annotation.ColorInt;
+import androidx.annotation.DimenRes;
 import androidx.annotation.Nullable;
 
 import com.google.android.material.button.MaterialButton;
@@ -39,38 +40,38 @@ public final class UiKit {
     // ---- colour roles -----------------------------------------------------
     // The constants are theme attributes; use Theme.color() to resolve them.
 
-    public static final int BG = R.attr.colorSurface;
-    public static final int PANEL = R.attr.colorSurfaceContainerLowest;
-    public static final int PANEL_TONAL = R.attr.colorSurfaceContainerLow;
-    public static final int INK = R.attr.colorOnSurface;
-    public static final int MUTED = R.attr.colorOnSurfaceVariant;
-    public static final int ACCENT = R.attr.colorPrimary;
-    public static final int ACCENT_SOFT = R.attr.colorPrimaryContainer;
-    public static final int LINE = R.attr.colorOutlineVariant;
+    public static final int BG = Attrs.COLOR_SURFACE;
+    public static final int PANEL = Attrs.COLOR_SURFACE_CONTAINER_LOWEST;
+    public static final int PANEL_TONAL = Attrs.COLOR_SURFACE_CONTAINER_LOW;
+    public static final int INK = Attrs.COLOR_ON_SURFACE;
+    public static final int MUTED = Attrs.COLOR_ON_SURFACE_VARIANT;
+    public static final int ACCENT = Attrs.COLOR_PRIMARY;
+    public static final int ACCENT_SOFT = Attrs.COLOR_PRIMARY_CONTAINER;
+    public static final int LINE = Attrs.COLOR_OUTLINE_VARIANT;
     public static final int SUCCESS = R.attr.colorSuccess;
     public static final int SUCCESS_BG = R.attr.colorSuccessContainer;
     public static final int SUCCESS_TEXT = R.attr.colorOnSuccessContainer;
-    public static final int DANGER = R.attr.colorError;
-    public static final int DANGER_BG = R.attr.colorErrorContainer;
-    public static final int DANGER_TEXT = R.attr.colorOnErrorContainer;
+    public static final int DANGER = Attrs.COLOR_ERROR;
+    public static final int DANGER_BG = Attrs.COLOR_ERROR_CONTAINER;
+    public static final int DANGER_TEXT = Attrs.COLOR_ON_ERROR_CONTAINER;
     public static final int WARNING_BG = R.attr.colorWarningContainer;
     public static final int WARNING_TEXT = R.attr.colorOnWarningContainer;
-    public static final int SURFACE_SOFT = R.attr.colorSurfaceContainer;
+    public static final int SURFACE_SOFT = Attrs.COLOR_SURFACE_CONTAINER;
 
     // Legacy names, kept because the workbenches still reference them.
-    public static final int BG_DARK = R.attr.colorSurface;
-    public static final int PANEL_DARK = R.attr.colorSurfaceContainerLow;
-    public static final int ACCENT_DARK = R.attr.colorPrimary;
-    public static final int MUTED_DARK = R.attr.colorOnSurfaceVariant;
-    public static final int WHITE = R.attr.colorOnSurface;
-    public static final int CARD_STROKE = R.attr.colorOutlineVariant;
+    public static final int BG_DARK = Attrs.COLOR_SURFACE;
+    public static final int PANEL_DARK = Attrs.COLOR_SURFACE_CONTAINER_LOW;
+    public static final int ACCENT_DARK = Attrs.COLOR_PRIMARY;
+    public static final int MUTED_DARK = Attrs.COLOR_ON_SURFACE_VARIANT;
+    public static final int WHITE = Attrs.COLOR_ON_SURFACE;
+    public static final int CARD_STROKE = Attrs.COLOR_OUTLINE_VARIANT;
     public static final int LOG_BG = R.attr.colorLogBackground;
     public static final int LOG_TEXT = R.attr.colorLogText;
-    public static final int INPUT_BG = R.attr.colorSurfaceContainerHigh;
-    public static final int INPUT_TEXT = R.attr.colorOnSurface;
-    public static final int BUTTON_PRIMARY_BG = R.attr.colorPrimary;
-    public static final int BUTTON_SECONDARY_BG = R.attr.colorSecondaryContainer;
-    public static final int BUTTON_ACCENT_BG = R.attr.colorPrimary;
+    public static final int INPUT_BG = Attrs.COLOR_SURFACE_CONTAINER_HIGH;
+    public static final int INPUT_TEXT = Attrs.COLOR_ON_SURFACE;
+    public static final int BUTTON_PRIMARY_BG = Attrs.COLOR_PRIMARY;
+    public static final int BUTTON_SECONDARY_BG = Attrs.COLOR_SECONDARY_CONTAINER;
+    public static final int BUTTON_ACCENT_BG = Attrs.COLOR_PRIMARY;
 
     private UiKit() {
     }
@@ -98,9 +99,9 @@ public final class UiKit {
         scroll.setClipToPadding(false);
         LinearLayout root = new LinearLayout(activity);
         root.setOrientation(LinearLayout.VERTICAL);
-        int horizontal = dp(activity, activity.getResources().getDimensionPixelSize(R.dimen.page_margin_horizontal));
-        int top = dp(activity, activity.getResources().getDimensionPixelSize(R.dimen.page_margin_top));
-        int bottom = dp(activity, activity.getResources().getDimensionPixelSize(R.dimen.page_margin_bottom));
+        int horizontal = dim(activity, R.dimen.page_margin_horizontal);
+        int top = dim(activity, R.dimen.page_margin_top);
+        int bottom = dim(activity, R.dimen.page_margin_bottom);
         root.setPadding(horizontal, top, horizontal, bottom);
         scroll.addView(root);
         return scroll;
@@ -127,7 +128,7 @@ public final class UiKit {
     public static MaterialCardView materialCard(Context context) {
         MaterialCardView card = new MaterialCardView(context);
         card.setCardBackgroundColor(color(context, PANEL, Color.WHITE));
-        card.setRadius(dp(context, context.getResources().getDimensionPixelSize(R.dimen.card_radius)));
+        card.setRadius(dim(context, R.dimen.card_radius));
         card.setCardElevation(0f);
         card.setStrokeWidth(dp(context, 1));
         card.setStrokeColor(color(context, LINE, Color.LTGRAY));
@@ -147,10 +148,10 @@ public final class UiKit {
     public static LinearLayout card(Activity activity) {
         LinearLayout card = new LinearLayout(activity);
         card.setOrientation(LinearLayout.VERTICAL);
-        int padding = dp(activity, activity.getResources().getDimensionPixelSize(R.dimen.card_padding));
+        int padding = dim(activity, R.dimen.card_padding);
         card.setPadding(padding, padding, padding, padding);
         GradientDrawable background = round(color(activity, PANEL, Color.WHITE),
-                dp(activity, activity.getResources().getDimensionPixelSize(R.dimen.card_radius)));
+                dim(activity, R.dimen.card_radius));
         background.setStroke(dp(activity, 1), color(activity, LINE, Color.LTGRAY));
         card.setBackground(background);
         card.setElevation(0f);
@@ -196,15 +197,15 @@ public final class UiKit {
     public static MaterialButton primary(Activity activity, String label) {
         MaterialButton button = baseButton(activity, label);
         button.setBackgroundTintList(tint(activity, ACCENT));
-        button.setTextColor(color(activity, R.attr.colorOnPrimary, Color.WHITE));
+        button.setTextColor(color(activity, Attrs.COLOR_ON_PRIMARY, Color.WHITE));
         return button;
     }
 
     /** A tonal button, used for secondary but important actions. */
     public static MaterialButton tonal(Activity activity, String label) {
         MaterialButton button = baseButton(activity, label);
-        button.setBackgroundTintList(tint(activity, R.attr.colorSecondaryContainer));
-        button.setTextColor(color(activity, R.attr.colorOnSecondaryContainer, Color.BLACK));
+        button.setBackgroundTintList(tint(activity, Attrs.COLOR_SECONDARY_CONTAINER));
+        button.setTextColor(color(activity, Attrs.COLOR_ON_SECONDARY_CONTAINER, Color.BLACK));
         return button;
     }
 
@@ -212,7 +213,7 @@ public final class UiKit {
     public static MaterialButton accentContainer(Activity activity, String label) {
         MaterialButton button = baseButton(activity, label);
         button.setBackgroundTintList(tint(activity, ACCENT_SOFT));
-        button.setTextColor(color(activity, R.attr.colorOnPrimaryContainer, Color.BLACK));
+        button.setTextColor(color(activity, Attrs.COLOR_ON_PRIMARY_CONTAINER, Color.BLACK));
         return button;
     }
 
@@ -237,8 +238,8 @@ public final class UiKit {
     /** A destructive action. */
     public static MaterialButton danger(Activity activity, String label) {
         MaterialButton button = baseButton(activity, label);
-        button.setBackgroundTintList(tint(activity, R.attr.colorErrorContainer));
-        button.setTextColor(color(activity, R.attr.colorOnErrorContainer, Color.RED));
+        button.setBackgroundTintList(tint(activity, Attrs.COLOR_ERROR_CONTAINER));
+        button.setTextColor(color(activity, Attrs.COLOR_ON_ERROR_CONTAINER, Color.RED));
         return button;
     }
 
@@ -247,10 +248,10 @@ public final class UiKit {
         button.setText(label == null ? "" : label);
         button.setAllCaps(false);
         button.setTextSize(TypedValue.COMPLEX_UNIT_SP, 14);
-        button.setMinHeight(dp(activity, activity.getResources().getDimensionPixelSize(R.dimen.button_height)));
+        button.setMinHeight(dim(activity, R.dimen.button_height));
         button.setInsetTop(0);
         button.setInsetBottom(0);
-        button.setCornerRadius(dp(activity, activity.getResources().getDimensionPixelSize(R.dimen.button_radius)));
+        button.setCornerRadius(dim(activity, R.dimen.button_radius));
         button.setLetterSpacing(0f);
         button.setPadding(dp(activity, 20), 0, dp(activity, 20), 0);
         return button;
@@ -293,9 +294,9 @@ public final class UiKit {
         GradientDrawable drawable = new GradientDrawable();
         drawable.setCornerRadius(dp(context, 12));
         drawable.setColor(color(context,
-                active ? R.attr.colorPrimaryContainer : R.attr.colorSurfaceContainerLow));
+                active ? Attrs.COLOR_PRIMARY_CONTAINER : Attrs.COLOR_SURFACE_CONTAINER_LOW));
         drawable.setStroke(dp(context, 1),
-                color(context, active ? R.attr.colorPrimary : R.attr.colorOutlineVariant));
+                color(context, active ? Attrs.COLOR_PRIMARY : Attrs.COLOR_OUTLINE_VARIANT));
         return drawable;
     }
 
@@ -541,11 +542,27 @@ public final class UiKit {
     }
 
     public static int dp(Activity activity, float value) {
-        return (int) (value * activity.getResources().getDisplayMetrics().density + 0.5f);
+        return dp((Context) activity, value);
     }
 
     public static int dp(Context context, float value) {
+        if (context == null) {
+            return (int) (value + 0.5f);
+        }
         return (int) (value * context.getResources().getDisplayMetrics().density + 0.5f);
+    }
+
+    /**
+     * Reads a dimension resource.
+     *
+     * <p>The value is already expressed in pixels, so it must not be passed
+     * through {@link #dp(Context, float)} a second time.</p>
+     */
+    public static int dim(Context context, @DimenRes int dimen) {
+        if (context == null) {
+            return 0;
+        }
+        return context.getResources().getDimensionPixelSize(dimen);
     }
 
     /** Adds a view to a parent using the standard top margin helper. */

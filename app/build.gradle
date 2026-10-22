@@ -24,14 +24,25 @@ android {
 
     testOptions {
         unitTests.returnDefaultValues = true
+        // The simulated device needs the packaged resources, otherwise the
+        // resource identifiers of the test do not match the application.
+        unitTests.includeAndroidResources = true
+        unitTests.all {
+            // The simulated device runs against a locally provided runtime so
+            // that the test task does not depend on Maven Central.
+            systemProperty 'robolectric.offline', 'true'
+            systemProperty 'robolectric.dependency.dir',
+                    System.getProperty('robolectric.dependency.dir',
+                            "${rootProject.projectDir}/../robolectric-deps")
+        }
     }
 
     defaultConfig {
         applicationId 'me.paranoid.wifikill'
         minSdk 21
         targetSdk 34
-        versionCode 2023
-        versionName '2.5.0'
+        versionCode 2024
+        versionName '2.5.1'
     }
 
     signingConfigs {
@@ -90,4 +101,7 @@ dependencies {
     implementation 'com.google.android.material:material:1.12.0'
 
     testImplementation 'junit:junit:4.13.2'
+    // Robolectric runs the UI on a simulated device so that layout and
+    // inflation problems are caught by the unit test task.
+    testImplementation 'org.robolectric:robolectric:4.11.1'
 }

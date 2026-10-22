@@ -85,15 +85,15 @@ public final class AttackActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        BG = UiKit.color(this, R.attr.colorSurface);
-        PANEL = UiKit.color(this, R.attr.colorSurfaceContainerLowest);
-        INK = UiKit.color(this, R.attr.colorOnSurface);
-        ACCENT = UiKit.color(this, R.attr.colorPrimary);
-        MUTED = UiKit.color(this, R.attr.colorOnSurfaceVariant);
+        BG = UiKit.color(this, Attrs.COLOR_SURFACE);
+        PANEL = UiKit.color(this, Attrs.COLOR_SURFACE_CONTAINER_LOWEST);
+        INK = UiKit.color(this, Attrs.COLOR_ON_SURFACE);
+        ACCENT = UiKit.color(this, Attrs.COLOR_PRIMARY);
+        MUTED = UiKit.color(this, Attrs.COLOR_ON_SURFACE_VARIANT);
         WARN_BG = UiKit.color(this, R.attr.colorWarningContainer);
         WARN_TEXT = UiKit.color(this, R.attr.colorOnWarningContainer);
-        DANGER_BG = UiKit.color(this, R.attr.colorErrorContainer);
-        DANGER_TEXT = UiKit.color(this, R.attr.colorOnErrorContainer);
+        DANGER_BG = UiKit.color(this, Attrs.COLOR_ERROR_CONTAINER);
+        DANGER_TEXT = UiKit.color(this, Attrs.COLOR_ON_ERROR_CONTAINER);
         buildUi();
         applyTarget(getIntent());
         detectEnvironment();
@@ -686,7 +686,7 @@ public final class AttackActivity extends BaseActivity {
         layout.setOrientation(LinearLayout.VERTICAL);
         layout.setPadding(dp(16), dp(16), dp(16), dp(16));
         GradientDrawable background = round(PANEL, dp(20));
-        background.setStroke(dp(1), UiKit.color(this, R.attr.colorOutlineVariant));
+        background.setStroke(dp(1), UiKit.color(this, Attrs.COLOR_OUTLINE_VARIANT));
         layout.setBackground(background);
         layout.setElevation(0f);
         return layout;

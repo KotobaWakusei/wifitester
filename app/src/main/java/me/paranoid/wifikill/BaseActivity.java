@@ -38,7 +38,7 @@ public abstract class BaseActivity extends AppCompatActivity {
      * switches the icon colour so they stay readable in both schemes.
      */
     protected void applySystemBars() {
-        int background = Theme.color(this, R.attr.colorSurface, Color.WHITE);
+        int background = Theme.color(this, Attrs.COLOR_SURFACE, Color.WHITE);
         getWindow().setStatusBarColor(background);
         getWindow().setNavigationBarColor(background);
         View decor = getWindow().getDecorView();
@@ -55,8 +55,8 @@ public abstract class BaseActivity extends AppCompatActivity {
         if (subtitle != null && subtitle.length() > 0) {
             toolbar.setSubtitle(subtitle);
         }
-        toolbar.setTitleTextColor(Theme.color(this, R.attr.colorOnSurface));
-        toolbar.setSubtitleTextColor(Theme.color(this, R.attr.colorOnSurfaceVariant));
+        toolbar.setTitleTextColor(Theme.color(this, Attrs.COLOR_ON_SURFACE));
+        toolbar.setSubtitleTextColor(Theme.color(this, Attrs.COLOR_ON_SURFACE_VARIANT));
         return toolbar;
     }
 

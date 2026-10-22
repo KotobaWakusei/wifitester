@@ -28,12 +28,13 @@ android {
         // resource identifiers of the test do not match the application.
         unitTests.includeAndroidResources = true
         unitTests.all {
-            // The simulated device runs against a locally provided runtime so
-            // that the test task does not depend on Maven Central.
-            systemProperty 'robolectric.offline', 'true'
-            systemProperty 'robolectric.dependency.dir',
-                    System.getProperty('robolectric.dependency.dir',
-                            "${rootProject.projectDir}/../robolectric-deps")
+            // When a local Android runtime is provided the simulated device
+            // uses it instead of downloading the runtime from Maven Central.
+            def runtime = System.getProperty('robolectric.dependency.dir')
+            if (runtime != null && file(runtime).isDirectory()) {
+                systemProperty 'robolectric.offline', 'true'
+                systemProperty 'robolectric.dependency.dir', runtime
+            }
         }
     }
 

@@ -48,6 +48,12 @@ jobs:
       - name: Build bundled Android ARM64 tools
         run: bash tools/build-android-toolchain.sh
 
+      - name: Cache the Android runtime of the interface tests
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-runtime-${{ runner.os }}-${{ hashFiles('app/build.gradle') }}
+
       - name: Run unit tests
         run: gradle --no-daemon testDebugUnitTest
 

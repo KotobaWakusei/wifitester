@@ -243,65 +243,11 @@ run_step() {
   return 1
 }
 
-check_prerequisites || true
-
-run_step "libpcap" build_libpcap || true
-run_step "tcpdump" build_tcpdump || true
-
-# The remaining tools depend on the crypto backend.
-if run_step "openssl" build_openssl; then
-  run_step "aircrack-ng" build_aircrack || true
-  run_step "hostapd" build_hostapd || true
+if [[ "${WIFITESTER_STRICT_TOOLCHAIN:-0}" == "1" ]]; then
+  check_prerequisites || fatal "required host build dependencies are missing"
 else
-  warn "skipping aircrack-ng and hostapd: no crypto backend"
+  check_prerequisites || warn "host build dependencies are missing; native tools may be skipped"
 fi
-
-# arpspoof is built from the sources in this repository and needs no
-# external dependency, so it is built even without the other tools.
-run_step "arpspoof" build_arpspoof || true
-
-log "packaged tools"
-packaged=0
-for binary in "$ASSETS"/*; do
-  [[ -f "$binary" ]] || continue
-  packaged=$((packaged + 1))
-  printf '%-24s %8s bytes\n' "$(basename "$binary")" "$(stat -c %s "$binary")"
-  "$READELF" -h "$binary" | grep -E 'Class:|Machine:' | sed 's/^/    /'
-done
-if [[ $packaged -eq 0 ]]; then
-  fatal "no tool was produced; see the errors above"
-fi
-
-# --------------------------------------------------------------------------
-# arpspoof: built from the sources in this repository so the result is
-# reproducible and does not depend on an external mirror.
-# --------------------------------------------------------------------------
-build_arpspoof() {
-  log "arpspoof (bundled source)"
-  local source="$ROOT/tools/native/arpspoof.c"
-  [[ -f "$source" ]] || fatal "missing $source"
-  "$CC" -O2 -fPIE -pie \
-    -o "$WORK/arpspoof" "$source"
-  install -m 0755 "$WORK/arpspoof" "$ASSETS/arpspoof" || return 1
-  "$STRIP" "$ASSETS/arpspoof"
-}
-
-# --------------------------------------------------------------------------
-# main
-# --------------------------------------------------------------------------
-run_step() {
-  local name="$1"; shift
-  if "$@"; then
-    return 0
-  fi
-  if [[ "${WIFITESTER_STRICT_TOOLCHAIN:-0}" == "1" ]]; then
-    fatal "$name failed"
-  fi
-  warn "$name failed; the corresponding feature stays unavailable in the app"
-  return 1
-}
-
-check_prerequisites || true
 
 run_step "libpcap" build_libpcap || true
 run_step "tcpdump" build_tcpdump || true

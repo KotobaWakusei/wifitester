@@ -115,9 +115,18 @@ public final class ToolPackageManager {
      */
     public boolean isPackageInstalled(ToolPackage pkg) {
         if (!prefs.getBoolean("pkg_" + pkg.id, false)) return false;
-        if (prefs.getBoolean(KEY_VERIFIED_PREFIX + pkg.id, false)) return true;
-        if (!isPackageComplete(pkg)) return false;
-        prefs.edit().putBoolean(KEY_VERIFIED_PREFIX + pkg.id, true).apply();
+        // A previous verification is not proof that the files still exist:
+        // users may remove tools manually or another package may replace them.
+        if (!isPackageComplete(pkg)) {
+            prefs.edit()
+                    .remove("pkg_" + pkg.id)
+                    .remove(KEY_VERIFIED_PREFIX + pkg.id)
+                    .apply();
+            return false;
+        }
+        if (!prefs.getBoolean(KEY_VERIFIED_PREFIX + pkg.id, false)) {
+            prefs.edit().putBoolean(KEY_VERIFIED_PREFIX + pkg.id, true).apply();
+        }
         return true;
     }
 

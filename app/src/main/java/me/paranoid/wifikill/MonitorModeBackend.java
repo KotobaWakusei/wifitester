@@ -66,12 +66,8 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                     "Invalid channel parameter"));
         }
 
-        // The new interface has to live in the PHY of the chosen parent. Plain
-        // "iw dev <if> interface add" registers it on the first (often 2.4 GHz
-        // only) PHY on dual-PHY devices and then fails when the requested
-        // channel belongs to the other one; OEM interfaces in a second wiphy
-        // fail the same way. The phy is therefore resolved explicitly and the
-        // interface is created with "iw phy <phy> interface add".
+        // Prefer the empirically verified "iw dev <parent> interface add" path.
+        // Wiphy discovery is retained as a fallback for drivers that require it.
         return "set -e; IF=" + quoteInterface(parent) + "; MON="
                 + quoteInterface(monitor) + "; " +
                 "command -v iw >/dev/null; command -v ip >/dev/null; " +

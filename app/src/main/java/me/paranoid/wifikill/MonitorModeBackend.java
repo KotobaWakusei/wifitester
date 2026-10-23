@@ -79,10 +79,13 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                 "PHY=" + phyIndexCommand() + "; " +
                 "if [ -z \"$PHY\" ]; then echo PHY_UNKNOWN; fi; " +
                 "ip link set \"$IF\" down; " +
-                "if [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor flags otherbss 2>/dev/null; then :; " +
-                "elif [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor 2>/dev/null; then :; " +
-                "elif iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then :; " +
-                "else iw dev \"$IF\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' ; exit $rc; }; fi; " +
+                // Prefer the exact iw dev form verified on the OnePlus 15. Some
+                // vendor drivers expose a wiphy but reject interface creation through
+                // "iw phy", even though creating it from the owning netdev works.
+                "if iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then :; " +
+                "elif iw dev \"$IF\" interface add \"$MON\" type monitor; then :; " +
+                "elif [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor flags otherbss; then :; " +
+                "else iw phy \"$PHY\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' ; exit $rc; }; fi; " +
                 "echo MONITOR_CREATED; " +
                 "iw dev \"$MON\" set freq " + channel.frequency + " HT20 || { freq_rc=$?; echo CHANNEL_FREQ_FAILED:$freq_rc; " +
                 "iw dev \"$MON\" set channel " + channel.number + " HT20 || { rc=$?; echo CHANNEL_SET_FAILED:$rc; " +

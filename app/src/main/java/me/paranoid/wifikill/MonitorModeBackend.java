@@ -83,11 +83,15 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                 "elif [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor flags otherbss; then :; " +
                 "else iw phy \"$PHY\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' ; exit $rc; }; fi; " +
                 "echo MONITOR_CREATED; " +
-                "iw dev \"$MON\" set freq " + channel.frequency + " HT20 || { freq_rc=$?; echo CHANNEL_FREQ_FAILED:$freq_rc; " +
-                "iw dev \"$MON\" set channel " + channel.number + " HT20 || { rc=$?; echo CHANNEL_SET_FAILED:$rc; " +
+                "if iw dev \"$MON\" set freq " + channel.frequency + " HT20; then :; " +
+                "elif iw dev \"$MON\" set freq " + channel.frequency + "; then :; " +
+                "elif iw dev \"$MON\" set channel " + channel.number + " HT20; then :; " +
+                "elif iw dev \"$MON\" set channel " + channel.number + "; then :; " +
+                "else rc=$?; echo CHANNEL_TUNING_FAILED:$rc; " +
                 "echo CHANNEL_DIAGNOSTICS_BEGIN; iw dev \"$MON\" info 2>&1; " +
                 "iw list 2>&1 | sed -n '/Frequencies:/,/valid interface combinations:/p' | head -n 100; " +
-                "echo CHANNEL_DIAGNOSTICS_END; exit $rc; }; }; " +
+                "echo CHANNEL_DIAGNOSTICS_END; exit $rc; fi; " +
+
                 "ip link set \"$MON\" up || { rc=$?; echo MONITOR_UP_FAILED:$rc; exit $rc; }; echo MONITOR_READY";
     }
 

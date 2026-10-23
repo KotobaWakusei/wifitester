@@ -29,9 +29,9 @@ public final class ToolPackageManager {
     
     public enum ToolPackage {
         CORE("core", "核心工具包", Arrays.asList("tcpdump", "arpspoof"), true),
-        AIRCRACK("aircrack", "Aircrack-ng 套件", Arrays.asList("aircrack-ng", "airodump-ng", "aireplay-ng", "airmon-ng"), false),
+        AIRCRACK("aircrack", "Aircrack-ng 套件", Arrays.asList("aircrack-ng", "airodump-ng", "aireplay-ng", "airmon-ng"), true),
         // iw is provided by Android/system tools and is not part of this package archive.
-        HOSTAPD("hostapd", "HostAPd 虚拟接入点", Arrays.asList("hostapd"), false);
+        HOSTAPD("hostapd", "HostAPd 虚拟接入点", Arrays.asList("hostapd"), true);
 
         public final String id;
         public final String name;

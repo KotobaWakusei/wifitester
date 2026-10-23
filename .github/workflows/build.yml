@@ -24,23 +24,65 @@ jobs:
       with:
         gradle-version: '8.14.5'
 
+    # The previous workflow built APKs without running the native toolchain
+    # builder. Those APKs therefore had no assets/toolchain/arm64-v8a binaries.
+    - name: Install Android NDK
+      shell: bash
+      run: |
+        set -euo pipefail
+        NDK_ZIP="$RUNNER_TEMP/android-ndk-r27c-linux.zip"
+        NDK_DIR="$RUNNER_TEMP/android-ndk-r27c"
+        curl --fail --location --retry 3 --retry-delay 2 \
+          https://dl.google.com/android/repository/android-ndk-r27c-linux.zip \
+          --output "$NDK_ZIP"
+        unzip -q "$NDK_ZIP" -d "$RUNNER_TEMP"
+        echo "ANDROID_NDK_HOME=$NDK_DIR" >> "$GITHUB_ENV"
+        echo "NDK_VERSION=27.2.12479018" >> "$GITHUB_ENV"
+        "$NDK_DIR/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android23-clang" --version
+
+    - name: Install native build dependencies
+      run: sudo apt-get update && sudo apt-get install -y flex bison
+
+    - name: Build bundled Android ARM64 tools
+      run: bash tools/build-android-toolchain.sh
+
+    - name: Run unit tests
+      run: gradle :app:testDebugUnitTest
+
     - name: Build debug APK
       run: gradle :app:assembleDebug
 
     - name: Build release APK
       run: gradle :app:assembleRelease
 
+    - name: Verify required bundled tools are in both APKs
+      shell: bash
+      run: |
+        set -euo pipefail
+        for APK in app/build/outputs/apk/debug/app-debug.apk app/build/outputs/apk/release/app-release-unsigned.apk; do
+          test -f "$APK"
+          unzip -l "$APK" | grep -F "assets/toolchain/arm64-v8a/tcpdump"
+          unzip -p "$APK" assets/toolchain/arm64-v8a/tcpdump > "$RUNNER_TEMP/tcpdump-check"
+          test -s "$RUNNER_TEMP/tcpdump-check"
+          file "$RUNNER_TEMP/tcpdump-check"
+          "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "$RUNNER_TEMP/tcpdump-check" | grep -E "Class:|Machine:"
+        done
+
     - name: Upload debug APK
       uses: actions/upload-artifact@v4
       with:
         name: debug-apk
-        path: app/build/outputs/apk/debug/
+        path: app/build/outputs/apk/debug/app-debug.apk
+        if-no-files-found: error
+        retention-days: 14
 
     - name: Upload release APK
       uses: actions/upload-artifact@v4
       with:
         name: release-apk
-        path: app/build/outputs/apk/release/
+        path: app/build/outputs/apk/release/app-release-unsigned.apk
+        if-no-files-found: error
+        retention-days: 14
 
   test:
     runs-on: ubuntu-latest

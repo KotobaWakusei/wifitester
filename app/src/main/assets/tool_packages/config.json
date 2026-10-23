@@ -22,14 +22,7 @@
       "preinstalled": false,
       "download_url": ""
     },
-    "reaver": {
-      "name": "Reaver WPS 工具",
-      "description": "此工具包尚未发布，暂不可下载",
-      "tools": ["reaver", "bully"],
-      "preinstalled": false,
-      "download_url": ""
-    }
-  },
+      },
   "supported_devices": {
     "qualcomm_qcald_3.0": {
       "monitor_mode": true,

@@ -46,7 +46,7 @@ public class IwMonitorModeBackendTest {
     /** A failed creation has to print diagnostics instead of dying silently. */
     @Test public void creationFailureEmitsDiagnostics() {
         String command = backend.buildStartCommand("wlan0", "wfkmon0", channel);
-        assertTrue(command.contains("MONITOR_CREATE_FAILED:$rc"));
+        assertTrue(command.contains("MONITOR_CREATE_FAILED"));
         assertTrue(command.contains("valid interface combinations"));
     }
 

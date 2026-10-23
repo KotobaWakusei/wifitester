@@ -74,14 +74,18 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                 "if iw dev \"$MON\" info >/dev/null 2>&1; then echo 'ERROR: monitor interface already exists'; exit 7; fi; " +
                 "PHY=" + phyIndexCommand() + "; " +
                 "if [ -z \"$PHY\" ]; then echo PHY_UNKNOWN; fi; " +
-                "ip link set \"$IF\" down; " +
-                // Prefer the exact iw dev form verified on the OnePlus 15. Some
-                // vendor drivers expose a wiphy but reject interface creation through
-                // "iw phy", even though creating it from the owning netdev works.
-                "if iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then :; " +
-                "elif iw dev \"$IF\" interface add \"$MON\" type monitor; then :; " +
-                "elif [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor flags otherbss; then :; " +
-                "else iw phy \"$PHY\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' ; exit $rc; }; fi; " +
+                "echo START_STAGE:parent-down; ip link set \"$IF\" down || { rc=$?; echo PARENT_DOWN_FAILED:$rc; exit $rc; }; " +
+                // Preserve each failure code: vendor drivers can reject one iw form
+                // but accept another. Never pass an empty PHY to "iw phy".
+                "echo START_STAGE:create-netdev-flags; " +
+                "if iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then echo MONITOR_CREATE_METHOD:netdev-flags; " +
+                "else rc=$?; echo MONITOR_CREATE_NETDEV_FLAGS_FAILED:$rc; " +
+                "if iw dev \"$IF\" interface add \"$MON\" type monitor; then echo MONITOR_CREATE_METHOD:netdev; " +
+                "else rc=$?; echo MONITOR_CREATE_NETDEV_FAILED:$rc; " +
+                "if [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor flags otherbss; then echo MONITOR_CREATE_METHOD:phy-flags; " +
+                "elif [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor; then echo MONITOR_CREATE_METHOD:phy; " +
+                "else rc=$?; echo MONITOR_CREATE_PHY_FAILED:$rc; echo MONITOR_CREATE_FAILED; " +
+                "iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' || true; exit 240; fi; fi; fi; fi; " +
                 "echo MONITOR_CREATED; " +
                 "if iw dev \"$MON\" set freq " + channel.frequency + " HT20; then :; " +
                 "elif iw dev \"$MON\" set freq " + channel.frequency + "; then :; " +

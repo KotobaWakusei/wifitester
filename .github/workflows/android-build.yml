@@ -46,6 +46,8 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y flex bison
 
       - name: Build bundled Android ARM64 tools
+        env:
+          WIFITESTER_STRICT_TOOLCHAIN: '1'
         run: bash tools/build-android-toolchain.sh
 
       - name: Cache the Android runtime of the interface tests

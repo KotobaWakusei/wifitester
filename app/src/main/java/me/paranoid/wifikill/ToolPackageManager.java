@@ -30,7 +30,8 @@ public final class ToolPackageManager {
     public enum ToolPackage {
         CORE("core", "核心工具包", Arrays.asList("tcpdump", "arpspoof"), true),
         AIRCRACK("aircrack", "Aircrack-ng 套件", Arrays.asList("aircrack-ng", "airodump-ng"), false),
-        HOSTAPD("hostapd", "HostAPd 虚拟接入点", Arrays.asList("hostapd", "iw"), false),
+        // iw is provided by Android/system tools and is not part of this package archive.
+        HOSTAPD("hostapd", "HostAPd 虚拟接入点", Arrays.asList("hostapd"), false),
         REAVER("reaver", "Reaver WPS 攻击", Arrays.asList("reaver", "bully"), false);
 
         public final String id;
@@ -114,20 +115,29 @@ public final class ToolPackageManager {
      * time it is seen.</p>
      */
     public boolean isPackageInstalled(ToolPackage pkg) {
-        if (!prefs.getBoolean("pkg_" + pkg.id, false)) return false;
-        // A previous verification is not proof that the files still exist:
-        // users may remove tools manually or another package may replace them.
-        if (!isPackageComplete(pkg)) {
+        // BundledToolchain extracts optional binaries shipped inside the APK.
+        // Detect those files even when no download preference has ever been set;
+        // otherwise the first-launch UI incorrectly offers a download for tools
+        // that are already present locally.
+        if (isPackageComplete(pkg)) {
+            if (!prefs.getBoolean("pkg_" + pkg.id, false)
+                    || !prefs.getBoolean(KEY_VERIFIED_PREFIX + pkg.id, false)) {
+                prefs.edit()
+                        .putBoolean("pkg_" + pkg.id, true)
+                        .putBoolean(KEY_VERIFIED_PREFIX + pkg.id, true)
+                        .remove(KEY_PENDING_PREFIX + pkg.id)
+                        .apply();
+            }
+            return true;
+        }
+        // A previous verification is not proof that the files still exist.
+        if (prefs.getBoolean("pkg_" + pkg.id, false)) {
             prefs.edit()
                     .remove("pkg_" + pkg.id)
                     .remove(KEY_VERIFIED_PREFIX + pkg.id)
                     .apply();
-            return false;
         }
-        if (!prefs.getBoolean(KEY_VERIFIED_PREFIX + pkg.id, false)) {
-            prefs.edit().putBoolean(KEY_VERIFIED_PREFIX + pkg.id, true).apply();
-        }
-        return true;
+        return false;
     }
 
     /** Records that the user asked for a package; it is not installed yet. */

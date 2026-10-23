@@ -12,17 +12,17 @@
       "name": "Aircrack-ng 套件",
       "description": "aircrack-ng, airodump-ng, aireplay-ng, airmon-ng",
       "tools": ["aircrack-ng", "airodump-ng", "aireplay-ng", "airmon-ng"],
-      "preinstalled": false,
+      "preinstalled": true,
       "download_url": ""
     },
     "hostapd": {
       "name": "HostAPd 虚拟接入点",
       "description": "hostapd - 创建虚拟 Wi-Fi 接入点",
       "tools": ["hostapd"],
-      "preinstalled": false,
+      "preinstalled": true,
       "download_url": ""
-    },
-      },
+    }
+  },
   "supported_devices": {
     "qualcomm_qcald_3.0": {
       "monitor_mode": true,

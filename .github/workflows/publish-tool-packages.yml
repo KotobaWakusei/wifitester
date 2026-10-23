@@ -1,0 +1,72 @@
+name: Publish native tool packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing GitHub release tag to attach archives to
+        required: true
+        default: v2.6.0
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  packages:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          ref: \${{ github.event.inputs.release_tag || github.ref_name }}
+
+      - name: Install Android NDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 --retry-delay 2 https://dl.google.com/android/repository/android-ndk-r27c-linux.zip --output "$RUNNER_TEMP/ndk.zip"
+          unzip -q "$RUNNER_TEMP/ndk.zip" -d "$RUNNER_TEMP"
+          echo "ANDROID_NDK_HOME=$RUNNER_TEMP/android-ndk-r27c" >> "$GITHUB_ENV"
+          echo "NDK_VERSION=27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Install native build dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential flex bison
+
+      - name: Build native toolchain
+        env:
+          WIFITESTER_STRICT_TOOLCHAIN: '1'
+        run: bash tools/build-android-toolchain.sh
+
+      - name: Assemble tool package archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          BIN=app/src/main/assets/toolchain/arm64-v8a
+          OUT="$RUNNER_TEMP/tool-packages"
+          mkdir -p "$OUT/core" "$OUT/aircrack" "$OUT/hostapd"
+          for tool in tcpdump arpspoof; do
+            test -s "$BIN/$tool"
+            install -m 0755 "$BIN/$tool" "$OUT/core/$tool"
+          done
+          for tool in aircrack-ng airodump-ng aireplay-ng airmon-ng; do
+            test -s "$BIN/$tool"
+            install -m 0755 "$BIN/$tool" "$OUT/aircrack/$tool"
+          done
+          test -s "$BIN/hostapd"
+          install -m 0755 "$BIN/hostapd" "$OUT/hostapd/hostapd"
+          tar -C "$OUT/core" -czf "$OUT/wifitester-toolpack-core-arm64-v8a.tar.gz" .
+          tar -C "$OUT/aircrack" -czf "$OUT/wifitester-toolpack-aircrack-arm64-v8a.tar.gz" .
+          tar -C "$OUT/hostapd" -czf "$OUT/wifitester-toolpack-hostapd-arm64-v8a.tar.gz" .
+          ls -lh "$OUT"/*.tar.gz
+
+      - name: Upload archives to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: \${{ github.event.inputs.release_tag || github.ref_name }}
+          files: |
+            \${{ runner.temp }}/tool-packages/wifitester-toolpack-aircrack-arm64-v8a.tar.gz
+            \${{ runner.temp }}/tool-packages/wifitester-toolpack-hostapd-arm64-v8a.tar.gz
+          fail_on_unmatched_files: true

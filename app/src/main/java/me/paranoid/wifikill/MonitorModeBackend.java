@@ -85,7 +85,7 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                 "if [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor flags otherbss; then echo MONITOR_CREATE_METHOD:phy-flags; " +
                 "elif [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor; then echo MONITOR_CREATE_METHOD:phy; " +
                 "else rc=$?; echo MONITOR_CREATE_PHY_FAILED:$rc; echo MONITOR_CREATE_FAILED; " +
-                "iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' || true; exit \"$rc\"; fi; fi; fi; fi; " +
+                "iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' || true; exit \"$rc\"; fi; fi; fi; " +
                 "echo MONITOR_CREATED; " +
                 "if iw dev \"$MON\" set freq " + channel.frequency + " HT20; then :; " +
                 "elif iw dev \"$MON\" set freq " + channel.frequency + "; then :; " +

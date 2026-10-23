@@ -13,14 +13,14 @@
       "description": "aircrack-ng, airodump-ng, aireplay-ng, airmon-ng",
       "tools": ["aircrack-ng", "airodump-ng", "aireplay-ng", "airmon-ng"],
       "preinstalled": false,
-      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/{version}/wifitester-toolpack-aircrack-arm64-v8a.tar.gz"
+      "download_url": ""
     },
     "hostapd": {
       "name": "HostAPd 虚拟接入点",
       "description": "hostapd - 创建虚拟 Wi-Fi 接入点",
       "tools": ["hostapd"],
       "preinstalled": false,
-      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/{version}/wifitester-toolpack-hostapd-arm64-v8a.tar.gz"
+      "download_url": ""
     },
     "reaver": {
       "name": "Reaver WPS 工具",

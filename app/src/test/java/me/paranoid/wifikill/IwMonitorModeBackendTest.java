@@ -33,9 +33,11 @@ public class IwMonitorModeBackendTest {
         String command = backend.buildStartCommand("wlan0", "wfkmon0", channel);
         assertTrue(command.contains("PHY_IDX=$(iw dev \"$IF\" info"));
         assertTrue(command.contains("/sys/class/ieee80211/phy*"));
-        assertTrue(command.contains("iw phy \"$PHY\" interface add \"$MON\" type monitor"));
-        // A missing wiphy must not abort the attempt: the plain fallback stays.
-        assertTrue(command.contains("elif iw dev \"$IF\" interface add \"$MON\" type monitor"));
+        // The tested OnePlus 15 path creates the monitor interface through the
+        // parent netdev first; wiphy-based creation is only a compatibility fallback.
+        assertTrue(command.indexOf("iw dev \\"$IF\\" interface add \\"$MON\\" type monitor flags otherbss")
+                < command.indexOf("iw phy \\"$PHY\\" interface add \\"$MON\\" type monitor"));
+        assertTrue(command.contains("elif iw dev \\"$IF\\" interface add \\"$MON\\" type monitor"));
     }
 
     @Test public void parsesTheWiphyOfTheParentInterface() {

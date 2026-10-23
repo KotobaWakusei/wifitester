@@ -365,6 +365,28 @@ public final class MonitorModeActivity extends BaseActivity {
                     try{p.exitValue();finished=true;break;}
                     catch(IllegalThreadStateException e){try{Thread.sleep(40L);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();break;}}
                 }
+                if(!finished && pid>1L){
+                    // Destroying the Java su wrapper does not reliably kill its
+                    // tcpdump child. Give tcpdump a graceful termination signal
+                    // and wait for the wrapper to finish its chown/chmod cleanup.
+                    Result term=runRoot("kill -TERM "+pid+" 2>/dev/null || true; echo CAPTURE_TERM_SENT",2500);
+                    runOnUiThread(()->append(getString(R.string.monitor_flush,trim(term.output,600))));
+                    long termDeadline=System.currentTimeMillis()+1400L;
+                    while(System.currentTimeMillis()<termDeadline){
+                        try{p.exitValue();finished=true;break;}
+                        catch(IllegalThreadStateException e){try{Thread.sleep(40L);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();break;}}
+                    }
+                }
+                if(!finished && pid>1L){
+                    // Last resort only: avoid leaving tcpdump running after the
+                    // monitor interface is removed. SIGKILL may truncate the pcap.
+                    runRoot("kill -KILL "+pid+" 2>/dev/null || true",2500);
+                    long killDeadline=System.currentTimeMillis()+800L;
+                    while(System.currentTimeMillis()<killDeadline){
+                        try{p.exitValue();finished=true;break;}
+                        catch(IllegalThreadStateException e){try{Thread.sleep(40L);}catch(InterruptedException interrupted){Thread.currentThread().interrupt();break;}}
+                    }
+                }
                 if(!finished){
                     p.destroy();
                     runOnUiThread(()->append(getString(R.string.monitor_capture_timeout)));

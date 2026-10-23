@@ -1,0 +1,38 @@
+# WiFi注入系统属性
+# 这些属性将影响整个系统的WiFi行为
+
+# 启用注入功能
+persist.wifitester.injection.enabled=1
+
+# 启用混杂模式
+persist.wifitester.promiscuous.enabled=1
+
+# 启用原始模式
+persist.wifitester.raw_mode.enabled=1
+
+# 设备支持标识
+ro.wifitester.supported=1
+
+# 调试模式
+debug.wifitester.verbose=1
+
+# WiFi增强设置
+persist.wifi.inject.enabled=1
+persist.wifi.promiscuous.enabled=1
+persist.wifi.raw_mode.enabled=1
+
+# 驱动参数
+ro.wifitester.driver.qca_cld3.enabled=1
+ro.wifitester.driver.version=qca_cld3_peach_v2
+
+# 兼容性设置
+ro.wifitester.compatibility.oneplus15=1
+ro.wifitester.compatibility.sm8550=1
+
+# 性能优化
+persist.wifitester.optimization.enabled=1
+persist.wifitester.buffer.size=262144
+
+# 安全设置（降低安全限制以支持注入）
+ro.wifitester.security.level=2
+persist.security.wifi.inject.allow=1

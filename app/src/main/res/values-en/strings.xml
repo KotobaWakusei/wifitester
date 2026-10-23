@@ -593,4 +593,23 @@
     <string name="wifi_scan_read_failed">The scan results could not be read: %1$s</string>
     <string name="wifi_permission_check_unsupported">This system version cannot check the scan permission.</string>
     <string name="wifi_settings_failed">The system Wi-Fi settings could not be opened</string>
+
+    <!-- Tool package management -->
+    <string name="setup_title">Welcome to WiFiTester</string>
+    <string name="setup_disclaimer">• For authorized network testing and educational purposes only\n• Prohibited for illegal intrusion or attacking others\' networks\n• Users bear full legal responsibility\n• Some features require Root permission</string>
+    <string name="setup_agreement">I have read and agree to the terms above</string>
+    <string name="setup_tools_title">Select tool packages to install</string>
+    <string name="setup_continue">Get Started</string>
+    <string name="settings_tools_title">Tool Package Management</string>
+    <string name="tools_downloading">Downloading %s...</string>
+    <string name="tools_uninstall_title">Uninstall Package</string>
+    <string name="tools_uninstall_confirm">Are you sure you want to uninstall %s? This will free up storage space.</string>
+    <string name="tool_download_started">Starting download of %s...</string>
+    <string name="attack_needs_tool_download">Tool %s is not installed. Would you like to download and install this package?</string>
+    <string name="attack_tool_missing_title">Tool Missing</string>
+    <string name="attack_tool_missing">Tool %s is installed but not found. There may be a path issue. Would you like to recheck?</string>
+    <string name="action_download">Download</string>
+    <string name="action_recheck">Recheck</string>
+    <string name="action_yes">OK</string>
+    <string name="action_no">Cancel</string>
 </resources>

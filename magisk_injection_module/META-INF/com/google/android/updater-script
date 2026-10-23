@@ -1,0 +1,33 @@
+# WiFiTester注入模块安装脚本
+# 需要Root权限和Magisk
+
+# 检查Magisk版本
+assert(getprop("ro.magisk.version") != "");
+
+# 检查Android版本
+assert(getprop("ro.build.version.sdk") >= "21");
+
+# 创建模块目录
+mkdir("/data/adb/modules/$MODULE_ID", 0755);
+
+# 复制模块文件
+copy("module.prop", "/data/adb/modules/$MODULE_ID/module.prop");
+copy("service.sh", "/data/adb/modules/$MODULE_ID/service.sh");
+copy("system.prop", "/data/adb/modules/$MODULE_ID/system.prop");
+copy("uninstall.sh", "/data/adb/modules/$MODULE_ID/uninstall.sh");
+
+# 创建启动脚本
+file_getprop("update-binary", "service.sh") == "/system/bin/sh" || abort("服务脚本错误");
+
+# 设置权限
+set_perm(0, 0, 0755, "/data/adb/modules/$MODULE_ID/service.sh");
+set_perm(0, 0, 0755, "/data/adb/modules/$MODULE_ID/uninstall.sh");
+set_perm_recursive(0, 0, 0755, 0644, "/data/adb/modules/$MODULE_ID");
+
+# 创建必要的目录
+mkdir("/data/local/tmp", 0777);
+
+# 显示安装信息
+ui_print("WiFiTester注入模块安装成功");
+ui_print("请重启设备以使更改生效");
+ui_print("重启后运行: echo 1 > /data/local/tmp/injection_enabled");

@@ -96,5 +96,17 @@
                 android:name="autoStoreLocales"
                 android:value="true" />
         </service>
+
+        <!-- First-launch disclaimer and tool package selection. -->
+        <activity
+            android:name="me.paranoid.wifikill.ToolSelectionActivity"
+            android:exported="false"
+            android:theme="@style/Theme.WiFiTester"
+            android:screenOrientation="portrait" />
+
+        <!-- Background downloader for optional tool packages. -->
+        <service
+            android:name="me.paranoid.wifikill.ToolInstallerService"
+            android:exported="false" />
     </application>
 </manifest>

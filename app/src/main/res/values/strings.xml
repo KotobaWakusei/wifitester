@@ -593,4 +593,23 @@
     <string name="wifi_scan_read_failed">无法读取扫描结果：%1$s</string>
     <string name="wifi_permission_check_unsupported">当前系统版本无法检查扫描权限。</string>
     <string name="wifi_settings_failed">无法打开系统 Wi-Fi 设置</string>
+
+    <!-- 工具包管理 -->
+    <string name="setup_title">欢迎使用 WiFiTester</string>
+    <string name="setup_disclaimer">• 仅限授权网络测试和教学实验\n• 禁止用于非法入侵或攻击他人网络\n• 使用者需承担全部法律责任\n• 部分功能需要 Root 权限</string>
+    <string name="setup_agreement">我已阅读并同意以上条款</string>
+    <string name="setup_tools_title">选择要安装的工具包</string>
+    <string name="setup_continue">开始使用</string>
+    <string name="settings_tools_title">工具包管理</string>
+    <string name="tools_downloading">正在下载 %s...</string>
+    <string name="tools_uninstall_title">卸载工具包</string>
+    <string name="tools_uninstall_confirm">确定要卸载 %s 吗？此操作将释放存储空间。</string>
+    <string name="tool_download_started">开始下载 %s...</string>
+    <string name="attack_needs_tool_download">工具 %s 未安装。是否下载安装此工具包？</string>
+    <string name="attack_tool_missing_title">工具缺失</string>
+    <string name="attack_tool_missing">工具 %s 已安装但未找到，可能是路径问题。是否重新检查？</string>
+    <string name="action_download">下载</string>
+    <string name="action_recheck">重新检查</string>
+    <string name="action_yes">确定</string>
+    <string name="action_no">取消</string>
 </resources>

@@ -1,0 +1,80 @@
+#!/sbin/sh
+# Magisk模块安装器
+# WiFiTester注入模块
+
+# 日志函数
+log() {
+    echo "[WiFiInstaller] $1" >> /data/local/tmp/wifitester_installer.log
+}
+
+# 检查Magisk版本
+check_magisk() {
+    if [ ! -d "/data/adb/modules" ]; then
+        log "错误：未找到Magisk模块目录"
+        exit 1
+    fi
+    
+    if [ ! -f "/data/adb/magisk" ] && [ ! -f "/sbin/magisk" ]; then
+        log "错误：未找到Magisk可执行文件"
+        exit 1
+    fi
+    
+    log "Magisk环境检查通过"
+}
+
+# 安装模块
+install_module() {
+    ZIP="$1"
+    TMPDIR="/tmp/magisk_install"
+    
+    # 创建临时目录
+    mkdir -p "$TMPDIR"
+    
+    # 解压模块
+    unzip -o "$ZIP" -d "$TMPDIR" >/dev/null 2>&1
+    
+    if [ ! -f "$TMPDIR/service.sh" ]; then
+        log "错误：模块文件不完整"
+        exit 1
+    fi
+    
+    # 获取模块ID
+    MODULE_ID=$(grep "id=" "$TMPDIR/module.prop" | cut -d= -f2)
+    
+    # 创建模块目录
+    MODULE_DIR="/data/adb/modules/$MODULE_ID"
+    mkdir -p "$MODULE_DIR"
+    
+    # 复制模块文件
+    cp -rf "$TMPDIR"/* "$MODULE_DIR/"
+    
+    # 设置权限
+    chmod -R 755 "$MODULE_DIR"
+    set_perm_recursive 0 0 0755 0644 "$MODULE_DIR"
+    set_perm 0 0 0755 "$MODULE_DIR/service.sh"
+    set_perm 0 0 0755 "$MODULE_DIR/post-fs-data.sh"
+    set_perm 0 0 0755 "$MODULEDIR/service.sh"
+    set_perm 0 0 0755 "$MODULEDIR/uninstall.sh"
+    
+    # 清理临时文件
+    rm -rf "$TMPDIR"
+    
+    log "模块安装完成: $MODULE_ID"
+}
+
+# 主函数
+main() {
+    log "开始安装WiFiTester注入模块"
+    
+    check_magisk
+    install_module "$3"
+    
+    # 运行安装脚本
+    /system/bin/sh "$2/service.sh"
+    
+    log "安装完成，请重启设备"
+    exit 0
+}
+
+# 执行主函数
+main "$@"

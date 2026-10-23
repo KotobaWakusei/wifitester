@@ -46,6 +46,17 @@ public final class MainActivity extends BaseActivity {
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        // 检查是否是首次启动
+        ToolPackageManager toolManager = new ToolPackageManager(this);
+        if (toolManager.isFirstLaunch()) {
+            Intent intent = new Intent(this, ToolSelectionActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(intent);
+            finish();
+            return;
+        }
+        
         buildShell();
         int restored = getIntent() != null ? getIntent().getIntExtra(EXTRA_TAB, 0) : 0;
         selectTab(clampTab(restored), false);
@@ -250,4 +261,10 @@ public final class MainActivity extends BaseActivity {
 
     /** Extra key used to open the shell on a specific tab. */
     public static final String EXTRA_TAB = "me.paranoid.wifikill.extra.TAB";
+    
+    /** 检查工具是否可用 */
+    public boolean isToolAvailable(String toolName) {
+        ToolPackageManager toolManager = new ToolPackageManager(this);
+        return toolManager.isToolAvailable(toolName);
+    }
 }

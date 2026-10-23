@@ -1,0 +1,64 @@
+{
+  "version": "1.0.0",
+  "packages": {
+    "core": {
+      "name": "核心工具包",
+      "description": "tcpdump, arpspoof - 网络监控和ARP欺骗工具",
+      "tools": ["tcpdump", "arpspoof"],
+      "preinstalled": true,
+      "size": "2.1MB",
+      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/v1.0.0/core-tools.tar.gz"
+    },
+    "aircrack": {
+      "name": "Aircrack-ng 套件",
+      "description": "aircrack-ng, airodump-ng - WiFi网络审计工具",
+      "tools": ["aircrack-ng", "airodump-ng"],
+      "preinstalled": false,
+      "size": "15.3MB",
+      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/v1.0.0/aircrack-tools.tar.gz"
+    },
+    "hostapd": {
+      "name": "HostAPd 虚拟接入点",
+      "description": "hostapd, iw - 创建虚拟WiFi接入点",
+      "tools": ["hostapd", "iw"],
+      "preinstalled": false,
+      "size": "8.7MB",
+      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/v1.0.0/hostapd-tools.tar.gz"
+    },
+    "reaver": {
+      "name": "Reaver WPS 攻击",
+      "description": "reaver, bully - WPS PIN攻击工具",
+      "tools": ["reaver", "bully"],
+      "preinstalled": false,
+      "size": "12.4MB",
+      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/v1.0.0/reaver-tools.tar.gz"
+    }
+  },
+  "supported_devices": {
+    "qualcomm_qcald_3.0": {
+      "monitor_mode": true,
+      "injection": false,
+      "description": "Qualcomm QCACLD-3.0 芯片组，支持监听模式但不支持注入"
+    },
+    "qualcomm_qcald_2.0": {
+      "monitor_mode": true,
+      "injection": true,
+      "description": "Qualcomm QCACLD-2.0 芯片组，支持监听和注入"
+    },
+    "broadcom_nexmon": {
+      "monitor_mode": true,
+      "injection": true,
+      "description": "Broadcom + NexMon，支持监听和注入"
+    },
+    "mediatek": {
+      "monitor_mode": true,
+      "injection": false,
+      "description": "MediaTek 芯片组，支持监听但不支持注入"
+    },
+    "huawei": {
+      "monitor_mode": false,
+      "injection": false,
+      "description": "华为设备，不支持监听模式"
+    }
+  }
+}

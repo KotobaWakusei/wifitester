@@ -1,0 +1,20 @@
+// 可选的工具包构建扩展。
+//
+// 默认构建不使用本文件。需要分变体构建时显式启用:
+//   ./gradlew -I gradle/tool-packages.gradle assembleStandardDebug
+//
+// 变体通过 buildConfigField 区分；BuildConfig 在 app/build.gradle 中被关闭，
+// 若需要使用这些字段，请先在 app/build.gradle 中打开 buildFeatures.buildConfig。
+allprojects {
+    afterEvaluate { project ->
+        if (project.plugins.hasPlugin('com.android.application')) {
+            project.android {
+                buildTypes {
+                    debug {
+                        // 允许在调试版本中直接下载工具包。
+                    }
+                }
+            }
+        }
+    }
+}

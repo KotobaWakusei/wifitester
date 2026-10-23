@@ -333,6 +333,11 @@ public final class AttackActivity extends BaseActivity {
                 RootShell.Result devices = RootShell.run(this, "iw dev 2>&1", RootShell.TIMEOUT_SHORT);
                 hasMonitor = devices.output.contains("Interface " + MONITOR_INTERFACE);
             }
+            
+            // 检查设备监听模式支持情况
+            ToolPackageManager toolManager = new ToolPackageManager(this);
+            ToolPackageManager.DeviceMonitorCapability monitorCapability = toolManager.getDeviceMonitorCapability();
+            
             final boolean hasRoot = granted;
             final boolean monitor = hasMonitor;
             runOnUiThread(() -> {
@@ -341,6 +346,10 @@ public final class AttackActivity extends BaseActivity {
                 statusState.setText(hasRoot ? getString(R.string.attack_root_granted) : getString(R.string.attack_root_missing));
                 statusState.setTextColor(hasRoot ? 0xff79e0b0 : DANGER_TEXT);
                 toolState.setText(describeTools());
+                
+                // 显示设备监听模式支持情况
+                append("设备信息: " + toolManager.getDeviceMonitorDescription());
+                
                 boolean authorized = SettingsStore.attackAuthorized(this);
                 startButton.setEnabled(hasRoot && authorized);
                 if (!authorized) {
@@ -352,20 +361,37 @@ public final class AttackActivity extends BaseActivity {
                 append(monitor
                         ? getString(R.string.attack_monitor_detected, MONITOR_INTERFACE)
                         : getString(R.string.attack_no_monitor, MONITOR_INTERFACE));
+                
+                // 根据设备能力提供功能建议
+                if (monitorCapability == ToolPackageManager.DeviceMonitorCapability.MONITOR_ONLY) {
+                    append("注意: 当前设备仅支持监听模式，不支持帧注入功能");
+                } else if (monitorCapability == ToolPackageManager.DeviceMonitorCapability.NO_MONITOR) {
+                    append("警告: 当前设备不支持Wi-Fi监听模式，建议使用OTG外接网卡");
+                }
             });
         }, "wifitester-attack-detect").start();
     }
 
     private String describeTools() {
         StringBuilder text = new StringBuilder(getString(R.string.attack_tools_header));
+        ToolPackageManager toolManager = new ToolPackageManager(this);
         String[] required = {"aireplay-ng", "airodump-ng", "aircrack-ng", "hostapd", "arpspoof", "iw", "ip"};
         for (String name : required) {
             String path = toolPaths.get(name);
             boolean present = path != null && path.startsWith("/");
+            boolean installed = toolManager.isToolAvailable(name);
+            
             if (text.length() > 5) {
                 text.append("  ");
             }
-            text.append(name).append(present ? " ✓" : " ×");
+            text.append(name).append(" ");
+            if (present && installed) {
+                text.append("✓");
+            } else if (installed) {
+                text.append("⚠"); // 已安装但未找到
+            } else {
+                text.append("×"); // 未安装
+            }
         }
         text.append(getString(R.string.attack_missing_command_hint));
         return text.toString();
@@ -397,14 +423,40 @@ public final class AttackActivity extends BaseActivity {
             return;
         }
         if (!isToolAvailable(module.tool)) {
-            new MaterialAlertDialogBuilder(this)
-                    .setTitle(getString(R.string.attack_needs_tool_title))
-                    .setMessage(getString(R.string.attack_needs_tool, module.tool))
-                    .setPositiveButton(getString(R.string.action_open_toolkit), (dialog, which) ->
-                            startActivity(new Intent(this, AircrackNgActivity.class)))
-                    .setNegativeButton(getString(R.string.action_cancel), null)
-                    .show();
-            return;
+            ToolPackageManager toolManager = new ToolPackageManager(this);
+            String toolName = module.tool;
+            
+            if (!toolManager.isToolAvailable(toolName)) {
+                // 工具未安装，提示用户下载
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(getString(R.string.attack_needs_tool_title))
+                        .setMessage(getString(R.string.attack_needs_tool_download, toolName))
+                        .setPositiveButton(getString(R.string.action_download), (dialog, which) -> {
+                            // 尝试下载对应的工具包
+                            for (ToolPackageManager.ToolPackage pkg : toolManager.getAllPackages()) {
+                                if (pkg.tools.contains(toolName)) {
+                                    ToolInstallerService.start(this, pkg);
+                                    toast(getString(R.string.tool_download_started, pkg.name));
+                                    break;
+                                }
+                            }
+                        })
+                        .setNeutralButton(getString(R.string.action_open_toolkit), (dialog, which) ->
+                                startActivity(new Intent(this, AircrackNgActivity.class)))
+                        .setNegativeButton(getString(R.string.action_cancel), null)
+                        .show();
+                return;
+            } else {
+                // 工具已安装但未找到，可能是路径问题
+                new MaterialAlertDialogBuilder(this)
+                        .setTitle(getString(R.string.attack_tool_missing_title))
+                        .setMessage(getString(R.string.attack_tool_missing, toolName))
+                        .setPositiveButton(getString(R.string.action_recheck), (dialog, which) ->
+                                detectEnvironment())
+                        .setNegativeButton(getString(R.string.action_cancel), null)
+                        .show();
+                return;
+            }
         }
 
         final String command;
@@ -438,6 +490,12 @@ public final class AttackActivity extends BaseActivity {
 
     /** Whether the tool a module depends on was found on the device. */
     private boolean isToolAvailable(String tool) {
+        // 首先检查工具是否已安装
+        ToolPackageManager toolManager = new ToolPackageManager(this);
+        if (!toolManager.isToolAvailable(tool)) {
+            return false;
+        }
+        // 然后检查工具是否实际存在
         String path = toolPaths.get(tool);
         return path != null && path.startsWith("/");
     }

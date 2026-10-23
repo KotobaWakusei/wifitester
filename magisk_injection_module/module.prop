@@ -1,0 +1,10 @@
+id=wifitester-injection
+name=WiFiTester Injection
+version=v1.0
+versionCode=1
+author=WiFiTester Team
+description=Enable frame injection on OnePlus 15 QCACLD 3.0
+updateJson=https://raw.githubusercontent.com/your-repo/module/update.json
+support=https://github.com/your-repo/issues
+buildDate=2026-10-22
+minMagisk=25.0

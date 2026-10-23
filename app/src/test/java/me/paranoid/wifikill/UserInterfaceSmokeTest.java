@@ -8,6 +8,7 @@ import android.widget.LinearLayout;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
+import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.robolectric.Robolectric;
@@ -27,6 +28,17 @@ import org.robolectric.annotation.Config;
 public class UserInterfaceSmokeTest {
 
     private static final int DENSITY_FACTOR = 3;
+
+    /**
+     * The shell tests need a device that already finished the first-launch
+     * onboarding, otherwise MainActivity defers to ToolSelectionActivity and
+     * the tab container is never built.
+     */
+    @Before
+    public void markOnboardingCompleted() {
+        new ToolPackageManager(RuntimeEnvironment.getApplication())
+                .markFirstLaunchCompleted();
+    }
 
     /** The shell must start and show the three workspaces. */
     @Test

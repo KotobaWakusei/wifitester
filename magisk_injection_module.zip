@@ -1,0 +1,141 @@
+#!/bin/bash
+
+# 一加15强制注入Magisk模块制作脚本
+# 作者: WiFiTester项目
+# 用途: 绕过Qualcomm QCACLD 3.0固件注入限制
+
+MODULE_NAME="wifitester_injection"
+MODULE_ID="com.wifitester.injection"
+MODULE_VERSION="1.0"
+MODULE_AUTHOR="WiFiTester"
+
+# 创建模块目录
+mkdir -p $MODULE_ID
+cd $MODULE_ID
+
+# 创建模块信息文件
+cat > module.prop << EOF
+id=$MODULE_ID
+name=WiFiTester Injection
+version=$MODULE_VERSION
+versionCode=1
+author=$MODULE_AUTHOR
+description=Enable frame injection on OnePlus 15 QCACLD 3.0
+updateJson=https://raw.githubusercontent.com/your-repo/module/update.json
+EOF
+
+# 创建service.sh - 模块安装脚本
+cat > service.sh << 'EOF'
+#!/system/bin/sh
+
+# Magisk模块安装脚本
+
+# 1. 备份原始驱动
+cp /vendor/lib64/wifi/qca_cld3_peach_v2.ko /sdcard/wifi_backup.ko 2>/dev/null || true
+
+# 2. 检查内核版本
+KERNEL_VERSION=$(uname -r)
+echo "Kernel version: $KERNEL_VERSION"
+
+# 3. 注入注入能力标志
+# 通过修改/proc/kmem或/dev/mem绕过固件检查
+if [ -e /dev/mem ]; then
+    # 定位并修改固件过滤函数
+    # 这里需要具体的内存地址计算
+    echo "Memory patching not implemented - requires kernel debugging"
+fi
+
+# 4. 设置SELinux为permissive模式
+setenforce 0
+
+# 5. 创建注入控制文件
+echo "1" > /data/local/tmp/injection_enabled
+
+echo "WiFiTester Injection module installed"
+echo "Reboot to apply changes"
+EOF
+
+# 创建uninstall.sh - 模块卸载脚本
+cat > uninstall.sh << 'EOF'
+#!/system/bin/sh
+
+# 恢复原始设置
+setenforce 1 2>/dev/null || true
+
+# 清理注入控制文件
+rm -f /data/local/tmp/injection_enabled
+
+# 恢复原始驱动（如果存在）
+if [ -f /sdcard/wifi_backup.ko ]; then
+    # 需要重新刷入原始驱动
+    echo "Driver restoration requires manual intervention"
+fi
+
+echo "WiFiTester Injection module uninstalled"
+EOF
+
+# 创建post-fs-data.sh - 系统启动时执行
+cat > post-fs-data.sh << 'EOF'
+#!/system/bin/sh
+
+# 系统启动时启用注入
+# 等待WiFi服务启动
+
+# 检查是否需要启用注入
+if [ -f /data/local/tmp/injection_enabled ]; then
+    # 尝试设置注入参数
+    echo "1" > /sys/module/qca_cld3_peach_v2/parameters/inject 2>/dev/null || true
+    
+    # 设置promiscuous模式
+    echo "1" > /sys/module/qca_cld3_peach_v2/parameters/promiscuous 2>/dev/null || true
+fi
+
+# 保持SELinux permissive（可选）
+setenforce 0 2>/dev/null || true
+EOF
+
+# 创建system.prop - 系统属性
+cat > system.prop << EOF
+# WiFi注入相关属性
+persist.wifi.inject.enabled=1
+persist.wifi.promiscuous.enabled=1
+ro.wifitester.injection.supported=1
+EOF
+
+# 创建META-INF目录
+mkdir -p META-INF/com/google/android
+cat > META-INF/com/google/android/update-binary << 'EOF'
+#!/sbin/sh
+# 更新脚本
+echo "Installing WiFiTester Injection module..."
+unzip -o "$3" "service.sh" "module.prop" "system.prop" "uninstall.sh" "post-fs-data.sh"
+chmod 755 service.sh uninstall.sh post-fs-data.sh
+./service.sh
+EOF
+
+cat > META-INF/com/google/android/updater-script << 'EOF'
+# 需要Root权限
+assert(getprop("ro.build.version.sdk") >= "21");
+
+# 创建模块目录
+mkdir("/data/adb/modules/$MODULE_ID", 0755);
+copy("system.prop", "/data/adb/modules/$MODULE_ID/system.prop");
+copy("post-fs-data.sh", "/data/adb/modules/$MODULE_ID/post-fs-data.sh");
+copy("uninstall.sh", "/data/adb/modules/$MODULE_ID/uninstall.sh");
+copy("module.prop", "/data/adb/modules/$MODULE_ID/module.prop");
+
+# 设置权限
+set_perm_recursive(1000, 1000, 0755, 0644, "/data/adb/modules/$MODULE_ID");
+set_perm(0, 0, 0755, "/data/adb/modules/$MODULE_ID/post-fs-data.sh");
+set_perm(0, 0, 0755, "/data/adb/modules/$MODULE_ID/uninstall.sh");
+EOF
+
+# 创建ZIP文件
+zip -r ../$MODULE_NAME.zip .
+
+cd ..
+echo "Magisk模块 $MODULE_NAME.zip 已创建"
+echo "通过Magisk Manager安装并重启"
+
+# 清理
+rm -rf $MODULE_ID

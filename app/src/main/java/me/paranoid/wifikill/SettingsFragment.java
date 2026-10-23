@@ -8,6 +8,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.fragment.app.Fragment;
 
@@ -45,6 +46,7 @@ public final class SettingsFragment extends Fragment {
         root.addView(buildCaptureCard(), LightKit.bottom(getActivity(), 12));
         root.addView(buildRootCard(), LightKit.bottom(getActivity(), 12));
         root.addView(buildSafetyCard(), LightKit.bottom(getActivity(), 12));
+        root.addView(buildToolsCard(), LightKit.bottom(getActivity(), 12));
         root.addView(buildAboutCard());
 
         return scroll;
@@ -320,6 +322,109 @@ public final class SettingsFragment extends Fragment {
         row.addView(labels, new LinearLayout.LayoutParams(0, -2, 1));
         row.addView(toggle);
         return row;
+    }
+
+    // ---- tools ------------------------------------------------------------
+
+    private LinearLayout buildToolsCard() {
+        LinearLayout card = LightKit.card(getActivity());
+        card.addView(LightKit.text(getActivity(), getString(R.string.settings_tools_title), 16, LightKit.INK, true));
+
+        ToolPackageManager toolManager = new ToolPackageManager(getActivity());
+        LinearLayout container = new LinearLayout(getActivity());
+        container.setOrientation(LinearLayout.VERTICAL);
+        
+        // 添加设备信息
+        TextView deviceInfo = LightKit.text(getActivity(), 
+                "设备信息: " + toolManager.getDeviceMonitorDescription(), 12, LightKit.MUTED, false);
+        card.addView(deviceInfo, LightKit.top(getActivity(), 8));
+        
+        long totalSize = 0;
+        for (ToolPackageManager.ToolPackage pkg : toolManager.getAllPackages()) {
+            totalSize += pkg.getSizeBytes(getActivity());
+            
+            LinearLayout item = new LinearLayout(getActivity());
+            item.setOrientation(LinearLayout.HORIZONTAL);
+            item.setPadding(dp(16), dp(12), dp(16), dp(12));
+            
+            LinearLayout info = new LinearLayout(getActivity());
+            info.setOrientation(LinearLayout.VERTICAL);
+            info.setPadding(0, 0, dp(16), 0);
+            
+            TextView name = LightKit.text(getActivity(), pkg.name, 14, LightKit.INK, true);
+            info.addView(name);
+            
+            TextView size = LightKit.text(getActivity(), pkg.getSizeFormatted(getActivity()), 12, LightKit.MUTED, false);
+            info.addView(size);
+            
+            // 添加工具列表
+            TextView tools = LightKit.text(getActivity(), 
+                    "工具: " + String.join(", ", pkg.tools), 11, LightKit.MUTED, false);
+            info.addView(tools);
+            
+            item.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
+            
+            if (pkg.preInstalled) {
+                TextView status = LightKit.text(getActivity(), "内置", 12, LightKit.SUCCESS, false);
+                item.addView(status);
+            } else {
+                MaterialButton action = new MaterialButton(getActivity());
+                action.setText(toolManager.isPackageInstalled(pkg) ? "卸载" : "下载");
+                action.setTextSize(12);
+                action.setMinimumWidth(dp(80));
+                action.setOnClickListener(v -> {
+                    if (toolManager.isPackageInstalled(pkg)) {
+                        showUninstallDialog(pkg);
+                    } else {
+                        startDownload(pkg);
+                    }
+                });
+                item.addView(action);
+            }
+            
+            container.addView(item);
+            
+            // 添加分隔线
+            if (pkg != toolManager.getAllPackages().get(toolManager.getAllPackages().size() - 1)) {
+                View divider = new View(getActivity());
+                divider.setBackgroundColor(UiKit.color(getActivity(), LightKit.MUTED));
+                divider.setMinimumHeight(1);
+                container.addView(divider);
+            }
+        }
+        
+        card.addView(container, LightKit.top(getActivity(), 10));
+        
+        TextView totalInfo = LightKit.text(getActivity(), 
+                "总占用空间: " + formatFileSize(totalSize), 12, LightKit.MUTED, false);
+        card.addView(totalInfo, LightKit.top(getActivity(), 8));
+        
+        return card;
+    }
+    
+    private void showUninstallDialog(ToolPackageManager.ToolPackage pkg) {
+        new MaterialAlertDialogBuilder(host())
+                .setTitle(getString(R.string.tools_uninstall_title))
+                .setMessage(getString(R.string.tools_uninstall_confirm, pkg.name))
+                .setPositiveButton(getString(R.string.action_yes), (dialog, which) -> {
+                    ToolPackageManager toolManager = new ToolPackageManager(getActivity());
+                    toolManager.uninstallPackage(pkg);
+                    MainActivity.notify(getActivity(), pkg.name + " 已卸载");
+                    getActivity().recreate();
+                })
+                .setNegativeButton(getString(R.string.action_no), null)
+                .show();
+    }
+    
+    private void startDownload(ToolPackageManager.ToolPackage pkg) {
+        ToolInstallerService.start(getActivity(), pkg);
+        MainActivity.notify(getActivity(), "开始下载 " + pkg.name);
+    }
+    
+    private String formatFileSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
+        return String.format("%.1f MB", bytes / (1024.0 * 1024));
     }
 
     // ---- about ------------------------------------------------------------

@@ -110,6 +110,29 @@ bash tools/build-android-toolchain.sh
 
 内置二进制属于构建产物，已在 `.gitignore` 中排除，由 CI 重新构建。
 
+### 构建可选工具包（按需下载）
+
+`aircrack-ng`、`hostapd`、`reaver` 体积较大，作为 GitHub Release 附件发布，应用在 **设置 → 工具包管理** 中按需下载：
+
+```bash
+export ANDROID_NDK_HOME=/path/to/android-ndk
+bash tools/build-toolpacks.sh
+```
+
+产物写入 `build/toolpacks/`，共三个压缩包：
+
+| 文件 | 内容 |
+| --- | --- |
+| `wifitester-toolpack-aircrack-arm64-v8a.tar.gz` | `aircrack-ng`、`airodump-ng`、`aireplay-ng`、`airmon-ng` |
+| `wifitester-toolpack-hostapd-arm64-v8a.tar.gz` | `hostapd` |
+| `wifitester-toolpack-reaver-arm64-v8a.tar.gz` | `reaver`、`wash` |
+
+宿主依赖与内置工具链相同（`make`、`curl`；aircrack-ng 需要 `autoconf`/`automake`/`libtool`，使用官方 release 包时无需）。三个包互相独立，某个上游无法构建时只跳过该包。
+
+发布时把这三个文件上传到与 `app/build.gradle` 中 `TOOL_PACKAGE_TAG` 相同的 Release 标签下；应用内的下载地址 `https://github.com/KotobaWakusei/wifitester/releases/download/{version}/…` 中的 `{version}` 会在运行时替换为该标签。`release.sh` 检测到 `build/toolpacks/*.tar.gz` 时会自动复制到 `releases/`。
+
+若尚未上传，应用会提示“服务器上找不到安装包（404）”并在工具包卡片上显示失败原因与“重试”按钮。
+
 ## 使用监听模式
 
 1. 打开 **WiFiTester 无线诊断**，按提示在 Root 管理器中授权。

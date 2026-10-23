@@ -19,6 +19,12 @@ public final class ToolPackageManager {
     private static final String PREFS_NAME = "tool_packages";
     private static final String KEY_FIRST_LAUNCH = "first_launch";
     private static final String CONFIG_FILE = "tool_packages/config.json";
+    /**
+     * Packages installed by versions <= 2.5.1 only set a flag while creating
+     * empty placeholder files, so the flag alone must not be trusted.
+     */
+    private static final String KEY_VERIFIED_PREFIX = "verified_";
+    private static final String KEY_PENDING_PREFIX = "pending_";
     private JSONObject config;
     
     public enum ToolPackage {
@@ -39,11 +45,12 @@ public final class ToolPackageManager {
             this.preInstalled = preInstalled;
         }
 
+        /** Total size of the tool files actually extracted for this package. */
         public long getSizeBytes(Context context) {
             long total = 0;
             for (String tool : tools) {
-                File toolFile = new File(context.getFilesDir(), "toolchain/" + tool);
-                if (toolFile.exists()) {
+                File toolFile = new File(context.getFilesDir(), "toolchain/bin/" + tool);
+                if (toolFile.isFile()) {
                     total += toolFile.length();
                 }
             }
@@ -51,11 +58,14 @@ public final class ToolPackageManager {
         }
 
         public String getSizeFormatted(Context context) {
-            long bytes = getSizeBytes(context);
-            if (bytes < 1024) return bytes + " B";
-            if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
-            return String.format("%.1f MB", bytes / (1024.0 * 1024));
+            return formatSize(getSizeBytes(context));
         }
+    }
+
+    public static String formatSize(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024 * 1024) return String.format(java.util.Locale.ROOT, "%.1f KB", bytes / 1024.0);
+        return String.format(java.util.Locale.ROOT, "%.1f MB", bytes / (1024.0 * 1024));
     }
 
     private final Context context;
@@ -95,30 +105,101 @@ public final class ToolPackageManager {
         prefs.edit().putBoolean(KEY_FIRST_LAUNCH, false).apply();
     }
 
-    /** 检查工具包是否已安装 */
+    /**
+     * 检查工具包是否已安装。
+     *
+     * <p>A package only counts as installed when every one of its tools exists
+     * as a real, non-empty executable. Older releases recorded the flag without
+     * downloading anything, so the flag is verified against the files the first
+     * time it is seen.</p>
+     */
     public boolean isPackageInstalled(ToolPackage pkg) {
-        if (pkg.preInstalled) return true;
-        return prefs.getBoolean("pkg_" + pkg.id, false);
+        if (!prefs.getBoolean("pkg_" + pkg.id, false)) return false;
+        if (prefs.getBoolean(KEY_VERIFIED_PREFIX + pkg.id, false)) return true;
+        if (!isPackageComplete(pkg)) return false;
+        prefs.edit().putBoolean(KEY_VERIFIED_PREFIX + pkg.id, true).apply();
+        return true;
     }
 
-    /** 安装工具包 */
+    /** Records that the user asked for a package; it is not installed yet. */
+    public void requestInstall(ToolPackage pkg) {
+        prefs.edit().putBoolean(KEY_PENDING_PREFIX + pkg.id, true).apply();
+    }
+
+    /** Whether a download was requested but has not finished yet. */
+    public boolean hasPendingInstall(ToolPackage pkg) {
+        return prefs.getBoolean(KEY_PENDING_PREFIX + pkg.id, false)
+                && !isPackageInstalled(pkg);
+    }
+
+    /** 标记工具包已安装，仅在文件全部就位后调用 */
     public void installPackage(ToolPackage pkg) {
-        prefs.edit().putBoolean("pkg_" + pkg.id, true).apply();
+        prefs.edit()
+                .putBoolean("pkg_" + pkg.id, true)
+                .putBoolean(KEY_VERIFIED_PREFIX + pkg.id, true)
+                .remove(KEY_PENDING_PREFIX + pkg.id)
+                .apply();
     }
 
-    /** 卸载工具包 */
-    public void uninstallPackage(ToolPackage pkg) {
-        if (pkg.preInstalled) return; // 核心工具包不可卸载
-        prefs.edit().remove("pkg_" + pkg.id).apply();
+    /** 卸载工具包，返回被删除的字节数 */
+    public long uninstallPackage(ToolPackage pkg) {
+        if (pkg.preInstalled) return 0; // 核心工具包不可卸载
+        long freed = getSizeBytes(pkg);
+        prefs.edit()
+                .remove("pkg_" + pkg.id)
+                .remove(KEY_VERIFIED_PREFIX + pkg.id)
+                .remove(KEY_PENDING_PREFIX + pkg.id)
+                .apply();
         deletePackageFiles(pkg);
+        return freed;
+    }
+
+    /** 工具包当前占用的空间 */
+    public long getSizeBytes(ToolPackage pkg) {
+        return pkg.getSizeBytes(context);
+    }
+
+    /**
+     * Deletes the 0 byte placeholder files written by releases <= 2.5.1 and
+     * clears the install flag that was set without any download. Their size is
+     * returned so callers can report what was reclaimed.
+     */
+    /**
+     * Only files the app owns are touched; a leftover file created with other
+     * permissions (for example by a root shell) is deleted lazily on install.
+     */
+    public long cleanUpLegacyPlaceholders() {
+        long removed = 0;
+        for (ToolPackage pkg : ToolPackage.values()) {
+            for (String tool : pkg.tools) {
+                File toolFile = new File(context.getFilesDir(), "toolchain/bin/" + tool);
+                if (!toolFile.isFile()) continue;
+                if (isToolFileReady(toolFile)) continue;
+                long length = toolFile.length();
+                if (toolFile.canWrite() && toolFile.delete()) removed += length;
+            }
+            if (prefs.getBoolean("pkg_" + pkg.id, false) && !isPackageComplete(pkg)) {
+                prefs.edit()
+                        .remove("pkg_" + pkg.id)
+                        .remove(KEY_VERIFIED_PREFIX + pkg.id)
+                        .apply();
+            }
+            // 内置工具包的文件由应用自己解包，无需下载标记即可视为已安装
+            if (pkg.preInstalled && isPackageComplete(pkg)) {
+                prefs.edit()
+                        .putBoolean("pkg_" + pkg.id, true)
+                        .putBoolean(KEY_VERIFIED_PREFIX + pkg.id, true)
+                        .apply();
+            }
+        }
+        return removed;
     }
 
     /** 检查工具是否可用 */
     public boolean isToolAvailable(String toolName) {
         for (ToolPackage pkg : ToolPackage.values()) {
             if (isPackageInstalled(pkg) && pkg.tools.contains(toolName)) {
-                File toolFile = new File(context.getFilesDir(), "toolchain/" + toolName);
-                return toolFile.exists() && toolFile.canExecute();
+                return isToolFileReady(new File(context.getFilesDir(), "toolchain/bin/" + toolName));
             }
         }
         return false;
@@ -126,16 +207,39 @@ public final class ToolPackageManager {
     
     /** 检查工具包是否完整安装 */
     public boolean isPackageComplete(ToolPackage pkg) {
-        if (!isPackageInstalled(pkg)) return false;
-        
         for (String tool : pkg.tools) {
-            File toolFile = new File(context.getFilesDir(), "toolchain/" + tool);
-            if (!toolFile.exists() || !toolFile.canExecute()) {
+            File toolFile = new File(context.getFilesDir(), "toolchain/bin/" + tool);
+            if (!isToolFileReady(toolFile)) {
                 return false;
             }
         }
         return true;
     }
+
+    /**
+     * A usable tool is a real executable binary. The 0 byte placeholders written
+     * by earlier releases, and files that happen to be executable but are not
+     * ELF binaries (or scripts), are rejected.
+     */
+    private static boolean isToolFileReady(File toolFile) {
+        if (!toolFile.isFile() || toolFile.length() < MIN_TOOL_BYTES || !toolFile.canExecute()) {
+            return false;
+        }
+        byte[] magic = new byte[4];
+        int read;
+        try (java.io.FileInputStream in = new java.io.FileInputStream(toolFile)) {
+            read = in.read(magic);
+        } catch (java.io.IOException e) {
+            return false;
+        }
+        if (read < 2) return false;
+        boolean elf = read == 4 && (magic[0] & 0xff) == 0x7f && magic[1] == 'E' && magic[2] == 'L' && magic[3] == 'F';
+        boolean script = magic[0] == '#' && magic[1] == '!';
+        return elf || script;
+    }
+
+    /** Smallest plausible binary size; placeholders are 0 bytes. */
+    private static final int MIN_TOOL_BYTES = 64;
     
     /** 获取设备监听模式支持情况 */
     public DeviceMonitorCapability getDeviceMonitorCapability() {
@@ -213,8 +317,8 @@ public final class ToolPackageManager {
 
     private void deletePackageFiles(ToolPackage pkg) {
         for (String tool : pkg.tools) {
-            File toolFile = new File(context.getFilesDir(), "toolchain/" + tool);
-            if (toolFile.exists()) {
+            File toolFile = new File(context.getFilesDir(), "toolchain/bin/" + tool);
+            if (toolFile.isFile()) {
                 toolFile.delete();
             }
         }
@@ -235,6 +339,17 @@ public final class ToolPackageManager {
             e.printStackTrace();
         }
         return null;
+    }
+
+    /**
+     * 工具包的下载地址；未配置时返回空字符串。
+     * 地址中的 {version} 会替换为当前发布标签（BuildConfig.TOOL_PACKAGE_TAG）。
+     */
+    public String getDownloadUrl(ToolPackage pkg) {
+        JSONObject info = getPackageInfo(pkg.id);
+        if (info == null) return "";
+        String url = info.optString("download_url", "").trim();
+        return url.replace("{version}", BuildConfig.TOOL_PACKAGE_TAG);
     }
     
     /** 获取设备支持信息 */

@@ -1,6 +1,11 @@
 package me.paranoid.wifikill;
 
+import android.app.Activity;
+import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,6 +23,10 @@ import com.google.android.material.materialswitch.MaterialSwitch;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
  * Third tab: appearance, capture defaults, Root handling, safety switches and
  * app info.
@@ -25,6 +34,8 @@ import com.google.android.material.textfield.TextInputLayout;
 public final class SettingsFragment extends Fragment {
 
     private TextView rootState;
+    /** The tools card is replaced in place instead of recreating the activity. */
+    private LinearLayout toolsCard;
 
     /**
      * The attached host context. The framework {@code Fragment} API has no
@@ -46,7 +57,8 @@ public final class SettingsFragment extends Fragment {
         root.addView(buildCaptureCard(), LightKit.bottom(getActivity(), 12));
         root.addView(buildRootCard(), LightKit.bottom(getActivity(), 12));
         root.addView(buildSafetyCard(), LightKit.bottom(getActivity(), 12));
-        root.addView(buildToolsCard(), LightKit.bottom(getActivity(), 12));
+        toolsCard = buildToolsCard();
+        root.addView(toolsCard, LightKit.bottom(getActivity(), 12));
         root.addView(buildAboutCard());
 
         return scroll;
@@ -340,8 +352,13 @@ public final class SettingsFragment extends Fragment {
         card.addView(deviceInfo, LightKit.top(getActivity(), 8));
         
         long totalSize = 0;
-        for (ToolPackageManager.ToolPackage pkg : toolManager.getAllPackages()) {
-            totalSize += pkg.getSizeBytes(getActivity());
+        List<ToolPackageManager.ToolPackage> packages = toolManager.getAllPackages();
+        for (ToolPackageManager.ToolPackage pkg : packages) {
+            boolean installed = toolManager.isPackageInstalled(pkg);
+            long sizeBytes = toolManager.getSizeBytes(pkg);
+            if (installed) {
+                totalSize += sizeBytes;
+            }
             
             LinearLayout item = new LinearLayout(getActivity());
             item.setOrientation(LinearLayout.HORIZONTAL);
@@ -354,22 +371,37 @@ public final class SettingsFragment extends Fragment {
             TextView name = LightKit.text(getActivity(), pkg.name, 14, LightKit.INK, true);
             info.addView(name);
             
-            TextView size = LightKit.text(getActivity(), pkg.getSizeFormatted(getActivity()), 12, LightKit.MUTED, false);
+            // 未安装时分不清大小，只显示安装状态；安装后显示真实占用
+            TextView size = LightKit.text(getActivity(), installed
+                    ? getString(R.string.tools_size_label, ToolPackageManager.formatSize(sizeBytes))
+                    : getString(R.string.tools_status_missing), 12, LightKit.MUTED, false);
             info.addView(size);
             
             // 添加工具列表
             TextView tools = LightKit.text(getActivity(), 
                     "工具: " + String.join(", ", pkg.tools), 11, LightKit.MUTED, false);
             info.addView(tools);
+
+            // 上次失败的原因保留在列表里，便于用户判断是没网还是包没发布
+            if (!installed && lastError.containsKey(pkg.id)) {
+                TextView error = LightKit.text(getActivity(),
+                        getString(R.string.tool_download_failed_detail, lastError.get(pkg.id)),
+                        11, LightKit.MUTED, false);
+                info.addView(error);
+            }
             
             item.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
             
             if (pkg.preInstalled) {
-                TextView status = LightKit.text(getActivity(), "内置", 12, LightKit.SUCCESS, false);
+                TextView status = LightKit.text(getActivity(), 
+                        installed ? getString(R.string.tools_status_installed) : getString(R.string.tools_status_missing),
+                        12, installed ? LightKit.SUCCESS : LightKit.MUTED, false);
                 item.addView(status);
             } else {
                 MaterialButton action = new MaterialButton(getActivity());
-                action.setText(toolManager.isPackageInstalled(pkg) ? "卸载" : "下载");
+                action.setText(installed ? "卸载"
+                        : lastError.containsKey(pkg.id) ? getString(R.string.tool_download_retry)
+                        : "下载");
                 action.setTextSize(12);
                 action.setMinimumWidth(dp(80));
                 action.setOnClickListener(v -> {
@@ -385,7 +417,7 @@ public final class SettingsFragment extends Fragment {
             container.addView(item);
             
             // 添加分隔线
-            if (pkg != toolManager.getAllPackages().get(toolManager.getAllPackages().size() - 1)) {
+            if (pkg != packages.get(packages.size() - 1)) {
                 View divider = new View(getActivity());
                 divider.setBackgroundColor(UiKit.color(getActivity(), LightKit.MUTED));
                 divider.setMinimumHeight(1);
@@ -396,8 +428,11 @@ public final class SettingsFragment extends Fragment {
         card.addView(container, LightKit.top(getActivity(), 10));
         
         TextView totalInfo = LightKit.text(getActivity(), 
-                "总占用空间: " + formatFileSize(totalSize), 12, LightKit.MUTED, false);
+                "总占用空间: " + ToolPackageManager.formatSize(totalSize), 12, LightKit.MUTED, false);
         card.addView(totalInfo, LightKit.top(getActivity(), 8));
+        card.addView(LightKit.text(getActivity(),
+                getString(R.string.tools_not_installed_hint), 11, LightKit.MUTED, false),
+                LightKit.top(getActivity(), 4));
         
         return card;
     }
@@ -408,23 +443,84 @@ public final class SettingsFragment extends Fragment {
                 .setMessage(getString(R.string.tools_uninstall_confirm, pkg.name))
                 .setPositiveButton(getString(R.string.action_yes), (dialog, which) -> {
                     ToolPackageManager toolManager = new ToolPackageManager(getActivity());
-                    toolManager.uninstallPackage(pkg);
-                    MainActivity.notify(getActivity(), pkg.name + " 已卸载");
-                    getActivity().recreate();
+                    long freed = toolManager.uninstallPackage(pkg);
+                    MainActivity.notify(getActivity(), getString(R.string.tools_uninstalled,
+                            pkg.name, ToolPackageManager.formatSize(freed)));
+                    refreshSettings();
                 })
                 .setNegativeButton(getString(R.string.action_no), null)
                 .show();
     }
     
     private void startDownload(ToolPackageManager.ToolPackage pkg) {
+        lastError.remove(pkg.id);
         ToolInstallerService.start(getActivity(), pkg);
-        MainActivity.notify(getActivity(), "开始下载 " + pkg.name);
+        MainActivity.notify(getActivity(), getString(R.string.tool_download_started, pkg.name));
     }
-    
-    private String formatFileSize(long bytes) {
-        if (bytes < 1024) return bytes + " B";
-        if (bytes < 1024 * 1024) return String.format("%.1f KB", bytes / 1024.0);
-        return String.format("%.1f MB", bytes / (1024.0 * 1024));
+
+    /** Keeps the failure reason of each package so the card can show it. */
+    private final Map<String, String> lastError = new HashMap<>();
+    private boolean receiverRegistered;
+
+    private final BroadcastReceiver progressReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            String packageId = intent.getStringExtra("package_id");
+            if (intent.getBooleanExtra("running", false)) {
+                if (packageId != null) lastError.remove(packageId);
+                return;
+            }
+            if (packageId != null && !intent.getBooleanExtra("success", false)) {
+                String message = intent.getStringExtra("message");
+                if (message != null) lastError.put(packageId, message);
+            } else if (packageId != null) {
+                lastError.remove(packageId);
+            }
+            if (getActivity() != null) {
+                MainActivity.notify(getActivity(), intent.getStringExtra("message"));
+                refreshSettings();
+            }
+        }
+    };
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        Activity activity = getActivity();
+        if (activity == null) return;
+        IntentFilter filter = new IntentFilter(ToolInstallerService.ACTION_PROGRESS);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            activity.registerReceiver(progressReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+        } else {
+            activity.registerReceiver(progressReceiver, filter);
+        }
+        receiverRegistered = true;
+    }
+
+    @Override
+    public void onPause() {
+        Activity activity = getActivity();
+        if (receiverRegistered && activity != null) {
+            activity.unregisterReceiver(progressReceiver);
+        }
+        receiverRegistered = false;
+        super.onPause();
+    }
+
+    /**
+     * Rebuilds only the tool card so the new install state shows up without
+     * recreating the activity (which would jump back to the first tab).
+     */
+    private void refreshSettings() {
+        Activity activity = getActivity();
+        if (activity == null || toolsCard == null) return;
+        View parent = (View) toolsCard.getParent();
+        if (!(parent instanceof LinearLayout)) return;
+        LinearLayout root = (LinearLayout) parent;
+        int index = root.indexOfChild(toolsCard);
+        root.removeViewAt(index);
+        toolsCard = buildToolsCard();
+        root.addView(toolsCard, index, LightKit.bottom(activity, 12));
     }
 
     // ---- about ------------------------------------------------------------
@@ -433,7 +529,7 @@ public final class SettingsFragment extends Fragment {
         LinearLayout card = LightKit.card(getActivity());
         card.addView(LightKit.text(getActivity(), getString(R.string.settings_about), 16, LightKit.INK, true));
         card.addView(LightKit.text(getActivity(),
-                getString(R.string.settings_about_version, "2.5.1"), 13, LightKit.MUTED, false),
+                getString(R.string.settings_about_version, BuildConfig.VERSION_NAME), 13, LightKit.MUTED, false),
                 LightKit.top(getActivity(), 6));
         card.addView(LightKit.text(getActivity(),
                 getString(R.string.settings_about_note),

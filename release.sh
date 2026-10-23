@@ -12,24 +12,25 @@ if [ ! -f "app/build.gradle" ]; then
     exit 1
 fi
 
-VERSION_CODE=$(grep -oP 'versionCode\s+\K\d+' app/build.gradle)
-VERSION_NAME=$(grep -oP 'versionName\s+["\']([^"\']+)["\']' app/build.gradle)
+VERSION_CODE=$(sed -n "s/.*versionCode[[:space:]]*\([0-9]*\).*/\1/p" app/build.gradle | head -1)
+VERSION_NAME=$(sed -n "s/.*versionName[[:space:]]*[\"']\([^\"']*\)[\"'].*/\1/p" app/build.gradle | head -1)
 
 echo "版本号: $VERSION_NAME ($VERSION_CODE)"
 
 # 构建所有变体
 echo "构建所有变体..."
-./gradlew clean
-./gradlew assembleDebug
-./gradlew assembleRelease
+GRADLE="${GRADLE:-/home/kali/.ac-toolchain/gradle-8.14.5/bin/gradle}"
+JAVA_HOME="${JAVA_HOME:-/home/kali/.ac-toolchain/jdk-17}"
+export JAVA_HOME
+GRADLE_OPTS="-Dorg.gradle.java.home=${JAVA_HOME}"
+"$GRADLE" $GRADLE_OPTS :app:clean :app:assembleDebug :app:assembleRelease
 
 # 创建发布目录
 mkdir -p releases
 
 # 复制APK文件
 cp app/build/outputs/apk/debug/app-debug.apk releases/wifitester-$VERSION_NAME-debug.apk
-cp app/build/outputs/apk/release/app-release-unsigned.apk releases/wifitester-$VERSION_NAME-release-unsigned.apk 2>/dev/null \
-    || cp app/build/outputs/apk/release/app-release.apk releases/wifitester-$VERSION_NAME-release.apk
+cp app/build/outputs/apk/release/app-release.apk releases/wifitester-$VERSION_NAME-release.apk
 
 # 生成校验和
 cd releases
@@ -37,6 +38,16 @@ for apk in *.apk; do
     sha256sum "$apk" > "$apk.sha256"
 done
 cd ..
+
+# 可选工具包（aircrack-ng / hostapd / reaver）作为 Release 附件发布。
+# 由 tools/build-toolpacks.sh 生成；存在时一并上传，保证应用内的下载地址可用。
+TOOLPACKS=(build/toolpacks/*.tar.gz)
+if [ -e "${TOOLPACKS[0]}" ]; then
+    cp "${TOOLPACKS[@]}" releases/
+    echo "已复制工具包: $(ls build/toolpacks/*.tar.gz | wc -l) 个"
+else
+    echo "提示: 未找到 build/toolpacks/*.tar.gz，跳过工具包上传"
+fi
 
 # 生成发布说明
 cat > releases/RELEASE_NOTES.md << EOF

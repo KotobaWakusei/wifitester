@@ -47,8 +47,10 @@ public final class MainActivity extends BaseActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         
-        // 检查是否是首次启动
         ToolPackageManager toolManager = new ToolPackageManager(this);
+        // 清理旧版本只创建空文件却标记为已安装的工具包
+        toolManager.cleanUpLegacyPlaceholders();
+        // 检查是否是首次启动
         if (toolManager.isFirstLaunch()) {
             Intent intent = new Intent(this, ToolSelectionActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK | Intent.FLAG_ACTIVITY_NEW_TASK);

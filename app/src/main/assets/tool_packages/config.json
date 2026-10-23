@@ -1,37 +1,33 @@
 {
-  "version": "1.0.0",
+  "version": "2.0.0",
   "packages": {
     "core": {
       "name": "核心工具包",
       "description": "tcpdump, arpspoof - 网络监控和ARP欺骗工具",
       "tools": ["tcpdump", "arpspoof"],
       "preinstalled": true,
-      "size": "2.1MB",
-      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/v1.0.0/core-tools.tar.gz"
+      "download_url": ""
     },
     "aircrack": {
       "name": "Aircrack-ng 套件",
-      "description": "aircrack-ng, airodump-ng - WiFi网络审计工具",
-      "tools": ["aircrack-ng", "airodump-ng"],
+      "description": "aircrack-ng, airodump-ng, aireplay-ng, airmon-ng",
+      "tools": ["aircrack-ng", "airodump-ng", "aireplay-ng", "airmon-ng"],
       "preinstalled": false,
-      "size": "15.3MB",
-      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/v1.0.0/aircrack-tools.tar.gz"
+      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/{version}/wifitester-toolpack-aircrack-arm64-v8a.tar.gz"
     },
     "hostapd": {
       "name": "HostAPd 虚拟接入点",
-      "description": "hostapd, iw - 创建虚拟WiFi接入点",
-      "tools": ["hostapd", "iw"],
+      "description": "hostapd - 创建虚拟WiFi接入点",
+      "tools": ["hostapd"],
       "preinstalled": false,
-      "size": "8.7MB",
-      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/v1.0.0/hostapd-tools.tar.gz"
+      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/{version}/wifitester-toolpack-hostapd-arm64-v8a.tar.gz"
     },
     "reaver": {
       "name": "Reaver WPS 攻击",
-      "description": "reaver, bully - WPS PIN攻击工具",
-      "tools": ["reaver", "bully"],
+      "description": "reaver, wash - WPS PIN攻击工具",
+      "tools": ["reaver", "wash"],
       "preinstalled": false,
-      "size": "12.4MB",
-      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/v1.0.0/reaver-tools.tar.gz"
+      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/{version}/wifitester-toolpack-reaver-arm64-v8a.tar.gz"
     }
   },
   "supported_devices": {

@@ -50,6 +50,13 @@ final class RootProcess {
             Process started = new ProcessBuilder("su", "-c", shell)
                     .redirectErrorStream(true)
                     .start();
+            // Some Root managers wait for stdin to close before running the
+            // command; the managed tools never read stdin themselves.
+            try {
+                started.getOutputStream().close();
+            } catch (Exception ignored) {
+                // The process may have exited already.
+            }
             RootProcess managed = new RootProcess(started);
             managed.pump(listener);
             return managed;

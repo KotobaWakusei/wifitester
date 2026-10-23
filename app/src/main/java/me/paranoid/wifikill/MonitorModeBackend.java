@@ -66,13 +66,23 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                     "Invalid channel parameter"));
         }
 
+        // The new interface has to live in the PHY of the chosen parent. Plain
+        // "iw dev <if> interface add" registers it on the first (often 2.4 GHz
+        // only) PHY on dual-PHY devices and then fails when the requested
+        // channel belongs to the other one; OEM interfaces in a second wiphy
+        // fail the same way. The phy is therefore resolved explicitly and the
+        // interface is created with "iw phy <phy> interface add".
         return "set -e; IF=" + quoteInterface(parent) + "; MON="
                 + quoteInterface(monitor) + "; " +
                 "command -v iw >/dev/null; command -v ip >/dev/null; " +
                 "if iw dev \"$MON\" info >/dev/null 2>&1; then echo 'ERROR: monitor interface already exists'; exit 7; fi; " +
+                "PHY=" + phyIndexCommand() + "; " +
+                "if [ -z \"$PHY\" ]; then echo PHY_UNKNOWN; fi; " +
                 "ip link set \"$IF\" down; " +
-                "if ! iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then " +
-                "iw dev \"$IF\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; exit $rc; }; fi; " +
+                "if [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor flags otherbss 2>/dev/null; then :; " +
+                "elif [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor 2>/dev/null; then :; " +
+                "elif iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss; then :; " +
+                "else iw dev \"$IF\" interface add \"$MON\" type monitor || { rc=$?; echo MONITOR_CREATE_FAILED:$rc; iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' ; exit $rc; }; fi; " +
                 "echo MONITOR_CREATED; " +
                 "iw dev \"$MON\" set freq " + channel.frequency + " HT20 || { freq_rc=$?; echo CHANNEL_FREQ_FAILED:$freq_rc; " +
                 "iw dev \"$MON\" set channel " + channel.number + " HT20 || { rc=$?; echo CHANNEL_SET_FAILED:$rc; " +
@@ -110,6 +120,29 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                 "iw dev " + monitor + " del >/dev/null 2>&1 || true; " +
                 "ip link set " + parent + " " + state + " >/dev/null 2>&1 || true; " +
                 "echo RESTORE_ATTEMPTED";
+    }
+
+    /**
+     * Prints the index of the wiphy that owns the parent interface, preceded by
+     * a marker line so the raw probe output can also be parsed by the UI.
+     */
+    /**
+     * Parses the wiphy index out of {@code iw dev <if> info} output.
+     * Returns null when the driver does not report a wiphy.
+     */
+    static String parsePhyIndex(String iwDevInfo) {
+        if (iwDevInfo == null) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("wiphy\\s+(\\d+)").matcher(iwDevInfo);
+        return m.find() ? m.group(1) : null;
+    }
+
+    static String phyIndexCommand() {
+        return "PHY_IDX=$(iw dev \"$IF\" info 2>/dev/null | sed -n 's/.*wiphy \\([0-9][0-9]*\\).*/\\1/p' | head -n 1); " +
+                "if [ -z \"$PHY_IDX\" ] && [ -d /sys/class/ieee80211 ]; then " +
+                "for d in /sys/class/ieee80211/phy*; do " +
+                "[ -e \"$d/device/net/$IF\" ] && { PHY_IDX=${d##*/phy}; break; }; done; fi; " +
+                "printf '%s' \"$PHY_IDX\"";
     }
 
     private static String quoteInterface(String validatedInterface) {

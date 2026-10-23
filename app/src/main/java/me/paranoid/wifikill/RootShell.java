@@ -54,6 +54,11 @@ final class RootShell {
         try {
             process = new ProcessBuilder("su", "-c", shell).redirectErrorStream(true).start();
             final Process running = process;
+            // Several Root managers keep the su wrapper alive until stdin is
+            // closed. Commands that never read input must not wait for the
+            // timeout, and a timed out command would be interrupted halfway
+            // through creating the monitor interface.
+            closeQuietly(process.getOutputStream());
             Thread reader = new Thread(() -> {
                 try (BufferedReader br = new BufferedReader(
                         new InputStreamReader(running.getInputStream()))) {
@@ -122,6 +127,16 @@ final class RootShell {
         }
         synchronized (output) {
             return new Result(code, output.toString());
+        }
+    }
+
+    /** Signals end of input to the shell; failures are expected when it already exited. */
+    private static void closeQuietly(java.io.OutputStream stream) {
+        if (stream == null) return;
+        try {
+            stream.close();
+        } catch (Exception ignored) {
+            // The process may have exited already.
         }
     }
 

@@ -256,7 +256,10 @@ public final class MonitorModeActivity extends BaseActivity {
                     if(r.output!=null && r.output.contains("MONITOR_CREATE_FAILED")) failure=getString(R.string.monitor_create_failed);
                     else if(r.output!=null && r.output.contains("CHANNEL_SET_FAILED")) failure=getString(R.string.monitor_channel_failed);
                     else if(r.output!=null && r.output.contains("MONITOR_UP_FAILED")) failure=getString(R.string.monitor_up_failed);
-                    final String failureMessage=failure;
+                    // Show the driver's own answer next to the summary; the full
+                    // output stays in the log view for the report.
+                    String detail=driverHint(r.output);
+                    final String failureMessage=detail.isEmpty()?failure:failure+"\n"+detail;
                     final String cleanupCommand=cleanup;
                     startButton.setEnabled(false);refreshButton.setEnabled(false);
                     new Thread(()->{
@@ -371,10 +374,14 @@ public final class MonitorModeActivity extends BaseActivity {
             String restore=("up".equals(previousInterfaceState)?"up":"down");
             Result r=runRoot(monitorBackend.buildStopCommand(activeInterface,selectedMonitor,previousInterfaceState),8000);
             boolean canExport=isUsableCapture(latestCaptureFile);
+            // Monitor mode drops the station link on the shared PHY, so the
+            // interface state alone is not enough to get the user back online.
+            final boolean reconnect=WifiRecovery.requestReconnect(this);
             runOnUiThread(()->{
                 running=false;createdMonitor=false;stopButton.setEnabled(false);startButton.setEnabled(rootGranted&&!channels.isEmpty()&&!interfaces.isEmpty());refreshButton.setEnabled(true);
                 captureExportButton.setEnabled(canExport);
-                capabilityState.setText(getString(R.string.monitor_stopped,restore,canExport?getString(R.string.monitor_capture_saved):getString(R.string.monitor_capture_missing)));
+                capabilityState.setText(getString(R.string.monitor_stopped,restore,canExport?getString(R.string.monitor_capture_saved):getString(R.string.monitor_capture_missing))
+                        +getString(reconnect?R.string.monitor_reconnect_requested:R.string.monitor_reconnect_manual));
                 append(getString(R.string.monitor_restore_attempt,trim(r.output,1200)));
             });
         }).start();
@@ -432,6 +439,21 @@ public final class MonitorModeActivity extends BaseActivity {
         if(log!=null)log.setText(snapshot);
         UiKit.updateLogCounter(logCard,UiKit.countLines(snapshot));
     }
+    /**
+     * Extracts the useful part of a failed start: the first kernel/driver error
+     * line, so the user can tell "operation not supported" (driver limitation)
+     * from "busy" (another interface owns the channel) without opening the log.
+     */
+    private String driverHint(String output){
+        if(output==null||output.isEmpty())return "";
+        Matcher m=Pattern.compile("(?im)^.*(operation not (supported|permitted)|device or resource busy|busy|invalid argument|no such device|not supported|cannot allocate|eperm|eopnotsupp|ebusy|eagain).*$").matcher(output);
+        if(m.find()){
+            String line=m.group().trim();
+            return line.length()>200?line.substring(0,200)+"…":line;
+        }
+        return "";
+    }
+
     private Result runRoot(String command,int timeout){
         RootShell.Result result=RootShell.run(this,command,timeout);
         return new Result(result.code,result.output);

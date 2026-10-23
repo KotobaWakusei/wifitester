@@ -31,8 +31,7 @@ public final class ToolPackageManager {
         CORE("core", "核心工具包", Arrays.asList("tcpdump", "arpspoof"), true),
         AIRCRACK("aircrack", "Aircrack-ng 套件", Arrays.asList("aircrack-ng", "airodump-ng", "aireplay-ng", "airmon-ng"), false),
         // iw is provided by Android/system tools and is not part of this package archive.
-        HOSTAPD("hostapd", "HostAPd 虚拟接入点", Arrays.asList("hostapd"), false),
-        REAVER("reaver", "Reaver WPS 攻击", Arrays.asList("reaver", "bully"), false);
+        HOSTAPD("hostapd", "HostAPd 虚拟接入点", Arrays.asList("hostapd"), false);
 
         public final String id;
         public final String name;

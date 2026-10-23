@@ -194,22 +194,22 @@ build_hostapd() {
     "https://w1.fi/cgit/hostap/snapshot/hostapd-${HOSTAPD_VERSION}.tar.gz"
   tar -xzf "$WORK/hostapd.tar.gz" -C "$WORK" || return 1
   cd "$WORK/hostapd-${HOSTAPD_VERSION}" || return 1
-  # The release archive keeps the daemon in its own directory; the snapshot
-  # variant already sits at the top level.
   if [[ -d hostapd ]]; then
-    cd hostapd
+    cd hostapd || return 1
   fi
   [[ -f Makefile ]] || fatal "hostapd: no Makefile found in $(pwd)"
-  # Upstream hostapd does not build without its configuration file.
   if [[ ! -f .config ]]; then
     [[ -f defconfig ]] || fatal "hostapd: defconfig missing in $(pwd)"
-    cp defconfig .config
+    cp defconfig .config || return 1
   fi
-  grep -q '^CONFIG_DRIVER_NL80211=y
+  if ! grep -q '^CONFIG_DRIVER_NL80211=y$' .config; then
+    echo 'CONFIG_DRIVER_NL80211=y' >> .config
+  fi
+  make -j"$(nproc)" CC="$CC" AR="$AR" RANLIB="$RANLIB" \
     CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include" \
     LDFLAGS="-L$PREFIX/openssl/lib -static" \
     EXTRA_CFLAGS="-D__ANDROID_API__=23" \
-    CONFIG_LIBNL=n CONFIG_IEEE8021AX=n CONFIG_DRIVER_NL80211=y
+    CONFIG_LIBNL=n CONFIG_IEEE8021AX=n CONFIG_DRIVER_NL80211=y || return 1
   install -m 0755 hostapd "$ASSETS/hostapd" || return 1
   "$STRIP" "$ASSETS/hostapd"
 }
@@ -271,15 +271,6 @@ done
 if [[ $packaged -eq 0 ]]; then
   fatal "no tool was produced; see the errors above"
 fi
- .config || echo 'CONFIG_DRIVER_NL80211=y' >> .config
-  make -j"$(nproc)" CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-    CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include" \
-    LDFLAGS="-L$PREFIX/openssl/lib -static" \
-    EXTRA_CFLAGS="-D__ANDROID_API__=23" \
-    CONFIG_LIBNL=n CONFIG_IEEE8021AX=n CONFIG_DRIVER_NL80211=y
-  install -m 0755 hostapd "$ASSETS/hostapd" || return 1
-  "$STRIP" "$ASSETS/hostapd"
-}
 
 # --------------------------------------------------------------------------
 # arpspoof: built from the sources in this repository so the result is

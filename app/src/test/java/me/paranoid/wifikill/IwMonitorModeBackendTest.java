@@ -31,8 +31,8 @@ public class IwMonitorModeBackendTest {
         assertTrue(command.contains("PHY_IDX=$(iw dev \"$IF\" info"));
         assertTrue(command.contains("/sys/class/ieee80211/phy*"));
         assertTrue(command.indexOf("iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss")
-                < command.indexOf("iw phy \"$PHY\" interface add \"$MON\" type monitor"));
-        assertTrue(command.contains("elif iw dev \"$IF\" interface add \"$MON\" type monitor"));
+                < command.indexOf("iw phy \"$PHY\" interface add \"$MON\" type monitor flags otherbss"));
+        assertTrue(command.contains("if iw dev \"$IF\" interface add \"$MON\" type monitor; then"));
     }
 
     @Test public void parsesTheWiphyOfTheParentInterface() {

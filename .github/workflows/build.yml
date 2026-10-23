@@ -44,7 +44,7 @@ jobs:
       run: sudo apt-get update && sudo apt-get install -y flex bison
 
     - name: Build bundled Android ARM64 tools
-      run: bash tools/build-android-toolchain.sh
+      run: WIFITESTER_STRICT_TOOLCHAIN=1 bash tools/build-android-toolchain.sh
 
     - name: Run unit tests
       run: gradle :app:testDebugUnitTest
@@ -66,6 +66,11 @@ jobs:
           test -s "$RUNNER_TEMP/tcpdump-check"
           file "$RUNNER_TEMP/tcpdump-check"
           "$ANDROID_NDK_HOME/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-readelf" -h "$RUNNER_TEMP/tcpdump-check" | grep -E "Class:|Machine:"
+          # These optional packages have no public download endpoint: require them
+          # to be bundled in the APK instead of shipping broken runtime URLs.
+          for tool in aircrack-ng airodump-ng hostapd; do
+            unzip -l "$APK" | grep -F "assets/toolchain/arm64-v8a/$tool"
+          done
         done
 
     - name: Upload debug APK

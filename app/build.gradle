@@ -43,7 +43,7 @@ android {
         // Optional tool packages are published as GitHub Release assets.
         // {version} in assets/tool_packages/config.json is replaced with this
         // tag at runtime, so the URL only has to change in one place.
-        buildConfigField 'String', 'TOOL_PACKAGE_TAG', '"v2.6.0"'
+        buildConfigField 'String', 'TOOL_PACKAGE_TAG', '"v2.5.1"'
         minSdk 21
         targetSdk 34
         versionCode 2026

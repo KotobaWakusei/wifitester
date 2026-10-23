@@ -254,7 +254,7 @@ public final class MonitorModeActivity extends BaseActivity {
                     // fast retry can race the old cleanup and trigger another EBUSY.
                     String failure=getString(R.string.monitor_start_failed);
                     if(r.output!=null && r.output.contains("MONITOR_CREATE_FAILED")) failure=getString(R.string.monitor_create_failed);
-                    else if(r.output!=null && r.output.contains("CHANNEL_SET_FAILED")) failure=getString(R.string.monitor_channel_failed);
+                    else if(r.output!=null && (r.output.contains("CHANNEL_SET_FAILED") || r.output.contains("CHANNEL_TUNING_FAILED") || r.output.contains("CHANNEL_FREQ_FAILED"))) failure=getString(R.string.monitor_channel_failed);
                     else if(r.output!=null && r.output.contains("MONITOR_UP_FAILED")) failure=getString(R.string.monitor_up_failed);
                     // Show the driver's own answer next to the summary; the full
                     // output stays in the log view for the report.

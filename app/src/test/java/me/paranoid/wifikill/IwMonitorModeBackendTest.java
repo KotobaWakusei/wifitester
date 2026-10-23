@@ -25,19 +25,14 @@ public class IwMonitorModeBackendTest {
         assertTrue(command.contains("MONITOR_READY"));
     }
 
-    /**
-     * Dual-PHY devices only accept a monitor interface in the PHY that owns the
-     * parent interface, so the command must resolve it and use "iw phy".
-     */
-    @Test public void createsTheInterfaceInTheParentPhy() {
+    /** The OnePlus 15's verified parent-netdev form must be tried first. */
+    @Test public void createsTheInterfaceThroughParentNetdevFirst() {
         String command = backend.buildStartCommand("wlan0", "wfkmon0", channel);
         assertTrue(command.contains("PHY_IDX=$(iw dev \"$IF\" info"));
         assertTrue(command.contains("/sys/class/ieee80211/phy*"));
-        // The tested OnePlus 15 path creates the monitor interface through the
-        // parent netdev first; wiphy-based creation is only a compatibility fallback.
-        assertTrue(command.indexOf("iw dev \\"$IF\\" interface add \\"$MON\\" type monitor flags otherbss")
-                < command.indexOf("iw phy \\"$PHY\\" interface add \\"$MON\\" type monitor"));
-        assertTrue(command.contains("elif iw dev \\"$IF\\" interface add \\"$MON\\" type monitor"));
+        assertTrue(command.indexOf("iw dev \"$IF\" interface add \"$MON\" type monitor flags otherbss")
+                < command.indexOf("iw phy \"$PHY\" interface add \"$MON\" type monitor"));
+        assertTrue(command.contains("elif iw dev \"$IF\" interface add \"$MON\" type monitor"));
     }
 
     @Test public void parsesTheWiphyOfTheParentInterface() {

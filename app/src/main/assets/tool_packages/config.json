@@ -1,9 +1,9 @@
 {
-  "version": "2.0.0",
+  "version": "2.6.0",
   "packages": {
     "core": {
       "name": "核心工具包",
-      "description": "tcpdump, arpspoof - 网络监控和ARP欺骗工具",
+      "description": "tcpdump, arpspoof - 网络诊断工具",
       "tools": ["tcpdump", "arpspoof"],
       "preinstalled": true,
       "download_url": ""
@@ -17,17 +17,17 @@
     },
     "hostapd": {
       "name": "HostAPd 虚拟接入点",
-      "description": "hostapd - 创建虚拟WiFi接入点",
+      "description": "hostapd - 创建虚拟 Wi-Fi 接入点",
       "tools": ["hostapd"],
       "preinstalled": false,
       "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/{version}/wifitester-toolpack-hostapd-arm64-v8a.tar.gz"
     },
     "reaver": {
-      "name": "Reaver WPS 攻击",
-      "description": "reaver, wash - WPS PIN攻击工具",
-      "tools": ["reaver", "wash"],
+      "name": "Reaver WPS 工具",
+      "description": "此工具包尚未发布，暂不可下载",
+      "tools": ["reaver", "bully"],
       "preinstalled": false,
-      "download_url": "https://github.com/KotobaWakusei/wifitester/releases/download/{version}/wifitester-toolpack-reaver-arm64-v8a.tar.gz"
+      "download_url": ""
     }
   },
   "supported_devices": {

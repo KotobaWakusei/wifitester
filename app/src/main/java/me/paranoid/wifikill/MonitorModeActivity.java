@@ -214,6 +214,9 @@ public final class MonitorModeActivity extends BaseActivity {
         if(running||ifaceSpinner.getSelectedItem()==null)return;
         activeInterface=ifaceSpinner.getSelectedItem().toString();
         if(!activeInterface.matches("[A-Za-z0-9_.-]+")){append(getString(R.string.monitor_unsafe_interface));return;}
+        // A previous Qualcomm con_mode run captures on the parent interface. Always
+        // reset the requested virtual-interface name before attempting a fresh start.
+        selectedMonitor = "wfkmon0";
         WifiChannelParser.Channel channel=channels.get(channelSpinner.getSelectedItemPosition());
         startButton.setEnabled(false);refreshButton.setEnabled(false);append(getString(R.string.monitor_starting,activeInterface,channel.label));
         new Thread(()->{

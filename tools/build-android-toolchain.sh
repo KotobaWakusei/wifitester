@@ -171,15 +171,18 @@ build_aircrack() {
       PKG_CONFIG_PATH="$PREFIX/openssl/lib/pkgconfig" \
       OPENSSL_PREFIX="$PREFIX/openssl"
   make -j"$(nproc)" || return 1
-  # Current upstream autotools builds place several tools under per-tool
-  # directories (for example src/aircrack-ng/aircrack-ng), not at src/<name>.
+  # Binaries may be symlinked and airmon-ng is shipped as a script under
+  # scripts/, so search the whole source tree and follow symlinks.
   for tool in aircrack-ng airodump-ng aireplay-ng airmon-ng; do
-    binary="$(find src -type f -name "$tool" -perm -u+x -print -quit)"
-    if [[ -n "$binary" ]]; then
+    binary="$(find -L . -type f -name "$tool" -print -quit)"
+    if [[ -n "$binary" && -x "$binary" ]]; then
       install -m 0755 "$binary" "$ASSETS/$tool"
-      "$STRIP" "$ASSETS/$tool"
+      # airmon-ng is a shell script; llvm-strip must only process ELF files.
+      if "$READELF" -h "$ASSETS/$tool" >/dev/null 2>&1; then
+        "$STRIP" "$ASSETS/$tool"
+      fi
     else
-      warn "aircrack-ng: $tool was not produced"
+      fatal "aircrack-ng: required tool $tool was not produced"
     fi
   done
 }
@@ -205,10 +208,12 @@ build_hostapd() {
   if ! grep -q '^CONFIG_DRIVER_NL80211=y$' .config; then
     echo 'CONFIG_DRIVER_NL80211=y' >> .config
   fi
+  # Do not pass CFLAGS/LDFLAGS on make's command line: GNU make then
+  # suppresses hostapd's own include flags (notably -I../src), causing
+  # utils/includes.h failures. hostapd supports EXTRA_CFLAGS/EXTRA_LDFLAGS.
   make -j"$(nproc)" CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-    CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include" \
-    LDFLAGS="-L$PREFIX/openssl/lib -static" \
-    EXTRA_CFLAGS="-D__ANDROID_API__=23" \
+    EXTRA_CFLAGS="-I$PREFIX/openssl/include -D__ANDROID_API__=23" \
+    EXTRA_LDFLAGS="-L$PREFIX/openssl/lib -static" \
     CONFIG_LIBNL=n CONFIG_IEEE8021AX=n CONFIG_DRIVER_NL80211=y || return 1
   install -m 0755 hostapd "$ASSETS/hostapd" || return 1
   "$STRIP" "$ASSETS/hostapd"

@@ -163,13 +163,20 @@ build_aircrack() {
   if [[ ! -x ./configure ]]; then
     ./autogen.sh
   fi
+  # These are configure environment variables, not positional configure
+  # arguments. CPPFLAGS is required for the OpenSSL probe (CFLAGS alone is
+  # overwritten by some generated makefiles); LIBS must include both static
+  # OpenSSL archives and Android's dl/pthread compatibility flags.
   CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-    CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include" \
-    LDFLAGS="-L$PREFIX/openssl/lib -static" \
+    CPPFLAGS="-I$PREFIX/openssl/include -I$PREFIX/include" \
+    CFLAGS="-O2 -fPIC" \
+    LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static" \
+    LIBS="-lssl -lcrypto -ldl -pthread" \
+    PKG_CONFIG_PATH="$PREFIX/openssl/lib/pkgconfig" \
+    OPENSSL_CFLAGS="-I$PREFIX/openssl/include" \
+    OPENSSL_LIBS="-L$PREFIX/openssl/lib -lssl -lcrypto" \
     ./configure --host=aarch64-linux-android --prefix="$PREFIX" \
-      --without-libnl --without-udev --disable-etc \
-      PKG_CONFIG_PATH="$PREFIX/openssl/lib/pkgconfig" \
-      OPENSSL_PREFIX="$PREFIX/openssl"
+      --without-libnl --without-udev --disable-etc --disable-gcrypt
   make -j"$(nproc)" || return 1
   # Install through upstream's install rules. The linked executables are
   # commonly emitted under .libs/ and airmon-ng is installed as a script;

@@ -68,7 +68,7 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
 
         // Prefer the empirically verified "iw dev <parent> interface add" path.
         // Wiphy discovery is retained as a fallback for drivers that require it.
-        return "set -e; IF=" + quoteInterface(parent) + "; MON="
+        return "set -e; IF=" + quoteInterface(parent) + "; ORIG_STATE=down; MON="
                 + quoteInterface(monitor) + "; " +
                 "command -v iw >/dev/null; command -v ip >/dev/null; " +
                 "if iw dev \"$MON\" info >/dev/null 2>&1; then echo 'ERROR: monitor interface already exists'; exit 7; fi; " +
@@ -84,8 +84,21 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                 "else rc=$?; echo MONITOR_CREATE_NETDEV_FAILED:$rc; " +
                 "if [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor flags otherbss; then echo MONITOR_CREATE_METHOD:phy-flags; " +
                 "elif [ -n \"$PHY\" ] && iw phy \"$PHY\" interface add \"$MON\" type monitor; then echo MONITOR_CREATE_METHOD:phy; " +
-                "else rc=$?; echo MONITOR_CREATE_PHY_FAILED:$rc; echo MONITOR_CREATE_FAILED; " +
-                "iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' || true; exit \"$rc\"; fi; fi; fi; " +
+                "else rc=$?; echo MONITOR_CREATE_PHY_FAILED:$rc; " +
+                // Qualcomm QCACLD builds may expose only a global con_mode switch and
+                // reject every secondary monitor vdev. Use that receive-only path only
+                // when the exact driver parameter exists; save the previous mode for restore.
+                "MODE=/sys/module/qca_cld3_peach_v2/parameters/con_mode; BACKUP=/data/local/tmp/wifitester-con_mode.backup; " +
+                "if [ -e \"$MODE\" ] && [ -w \"$MODE\" ] && [ ! -e \"$BACKUP\" ]; then " +
+                "OLD_MODE=$(cat \"$MODE\" 2>/dev/null); case \"$OLD_MODE\" in 0|1|2|3|4|5|6|7) ;; *) OLD_MODE=0 ;; esac; " +
+                "printf '%s\\n' \"$OLD_MODE\" > \"$BACKUP\" || exit 31; " +
+                "echo START_STAGE:qualcomm-con-mode; " +
+                "echo 4 > \"$MODE\" || { cat \"$BACKUP\" > \"$MODE\" 2>/dev/null || true; rm -f \"$BACKUP\"; echo CON_MODE_SET_FAILED; exit 32; }; " +
+                "ip link set \"$IF\" up || { cat \"$BACKUP\" > \"$MODE\" 2>/dev/null || true; rm -f \"$BACKUP\"; echo MONITOR_UP_FAILED; exit 33; }; " +
+                "if iw dev \"$IF\" set freq " + channel.frequency + " HT20 2>/dev/null || iw dev \"$IF\" set freq " + channel.frequency + " 2>/dev/null || iw dev \"$IF\" set channel " + channel.number + " 2>/dev/null; then " +
+                "echo MONITOR_PARENT_MODE; echo MONITOR_READY; exit 0; " +
+                "else rc=$?; echo CHANNEL_TUNING_FAILED:$rc; cat \"$BACKUP\" > \"$MODE\" 2>/dev/null || true; rm -f \"$BACKUP\"; ip link set \"$IF\" \"$ORIG_STATE\" 2>/dev/null || true; exit \"$rc\"; fi; fi; " +
+                "echo MONITOR_CREATE_FAILED; iw dev 2>&1; iw list 2>&1 | grep -E 'Wiphy|valid interface combinations' || true; exit \"$rc\"; fi; fi; fi; " +
                 "echo MONITOR_CREATED; " +
                 "if iw dev \"$MON\" set freq " + channel.frequency + " HT20; then :; " +
                 "elif iw dev \"$MON\" set freq " + channel.frequency + "; then :; " +
@@ -123,9 +136,15 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
         String parent = quoteInterface(validateInterface(parentInterface));
         String monitor = quoteInterface(validateInterface(monitorInterface));
         String state = normalizedState(originalState);
-        return "ip link set " + monitor + " down >/dev/null 2>&1 || true; " +
-                "iw dev " + monitor + " del >/dev/null 2>&1 || true; " +
+        return "MODE=/sys/module/qca_cld3_peach_v2/parameters/con_mode; BACKUP=/data/local/tmp/wifitester-con_mode.backup; " +
+                "if [ -f \"$BACKUP\" ] && [ -w \"$MODE\" ]; then " +
+                "ip link set " + parent + " down >/dev/null 2>&1 || true; " +
+                "cat \"$BACKUP\" > \"$MODE\"; RC=$?; rm -f \"$BACKUP\"; " +
                 "ip link set " + parent + " " + state + " >/dev/null 2>&1 || true; " +
+                "echo CON_MODE_RESTORED:$RC; " +
+                "else ip link set " + monitor + " down >/dev/null 2>&1 || true; " +
+                "iw dev " + monitor + " del >/dev/null 2>&1 || true; " +
+                "ip link set " + parent + " " + state + " >/dev/null 2>&1 || true; fi; " +
                 "echo RESTORE_ATTEMPTED";
     }
 

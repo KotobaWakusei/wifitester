@@ -56,6 +56,7 @@ public final class AttackActivity extends BaseActivity {
 
     private static final String CAPTURE_DIRECTORY = "attack-captures";
     private static final String MONITOR_INTERFACE = "wfkmon0";
+    private String monitorInterface = MONITOR_INTERFACE;
 
     private TextView statusState;
     private TextView toolState;
@@ -350,11 +351,13 @@ public final class AttackActivity extends BaseActivity {
             }
             // The monitor interface is a device state, not a tool: it has to be
             // queried separately with "iw dev".
-            boolean hasMonitor = false;
+            String detectedMonitorInterface = "";
             if (granted) {
                 RootShell.Result devices = RootShell.run(this, "iw dev 2>&1", RootShell.TIMEOUT_SHORT);
-                hasMonitor = devices.output.contains("Interface " + MONITOR_INTERFACE);
+                detectedMonitorInterface = findMonitorInterface(devices.output);
             }
+            final String currentMonitorInterface = detectedMonitorInterface;
+            final boolean hasMonitor = !detectedMonitorInterface.isEmpty();
             
             // 检查设备监听模式支持情况
             ToolPackageManager toolManager = new ToolPackageManager(this);
@@ -365,6 +368,7 @@ public final class AttackActivity extends BaseActivity {
             runOnUiThread(() -> {
                 rootGranted = hasRoot;
                 monitorPresent = monitor;
+                monitorInterface = currentMonitorInterface.isEmpty() ? MONITOR_INTERFACE : currentMonitorInterface;
                 statusState.setText(hasRoot ? getString(R.string.attack_root_granted) : getString(R.string.attack_root_missing));
                 statusState.setTextColor(hasRoot ? 0xff79e0b0 : DANGER_TEXT);
                 toolState.setText(describeTools());
@@ -387,7 +391,7 @@ public final class AttackActivity extends BaseActivity {
                     append(getString(R.string.attack_no_root));
                 }
                 append(monitor
-                        ? getString(R.string.attack_monitor_detected, MONITOR_INTERFACE)
+                        ? getString(R.string.attack_monitor_detected, currentMonitorInterface)
                         : getString(R.string.attack_no_monitor, MONITOR_INTERFACE));
                 
                 // 根据设备能力提供功能建议
@@ -398,6 +402,23 @@ public final class AttackActivity extends BaseActivity {
                 }
             });
         }, "wifitester-attack-detect").start();
+    }
+
+    /** Returns the interface whose current iw dev block says type monitor. */
+    private static String findMonitorInterface(String output) {
+        if (output == null || output.trim().isEmpty()) return "";
+        String[] blocks = output.split("(?m)(?=^\\s*Interface\\s+)");
+        for (String block : blocks) {
+            java.util.regex.Matcher name = java.util.regex.Pattern
+                    .compile("(?m)^\\s*Interface\\s+([A-Za-z0-9_.-]+)\\s*$")
+                    .matcher(block);
+            if (name.find() && java.util.regex.Pattern
+                    .compile("(?m)^\\s*type\\s+monitor\\s*$").matcher(block).find()) {
+                return name.group(1);
+            }
+        }
+        // Older iw/driver combinations may omit the type line for the known app interface.
+        return output.contains("Interface " + MONITOR_INTERFACE) ? MONITOR_INTERFACE : "";
     }
 
     private String describeTools() {
@@ -541,13 +562,13 @@ public final class AttackActivity extends BaseActivity {
 
         switch (module.id) {
             case AttackCatalog.ID_DEAUTH:
-                return AttackCommandBuilder.deauth("aireplay-ng", MONITOR_INTERFACE,
+                return AttackCommandBuilder.deauth("aireplay-ng", monitorInterface,
                         bssid, client, count);
             case AttackCatalog.ID_BEACON:
-                return AttackCommandBuilder.beaconFlood("aireplay-ng", MONITOR_INTERFACE,
+                return AttackCommandBuilder.beaconFlood("aireplay-ng", monitorInterface,
                         bssid, count);
             case AttackCatalog.ID_AUTH:
-                return AttackCommandBuilder.authFlood("aireplay-ng", MONITOR_INTERFACE,
+                return AttackCommandBuilder.authFlood("aireplay-ng", monitorInterface,
                         bssid, count);
             case AttackCatalog.ID_HANDSHAKE: {
                 File directory = new File(getFilesDir(), CAPTURE_DIRECTORY);
@@ -556,7 +577,7 @@ public final class AttackActivity extends BaseActivity {
                 }
                 String prefix = new File(directory,
                         "handshake-" + System.currentTimeMillis()).getAbsolutePath();
-                return AttackCommandBuilder.captureHandshake("airodump-ng", MONITOR_INTERFACE,
+                return AttackCommandBuilder.captureHandshake("airodump-ng", monitorInterface,
                         bssid, channel, prefix);
             }
             case AttackCatalog.ID_CRACK: {

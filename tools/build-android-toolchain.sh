@@ -161,8 +161,8 @@ build_aircrack() {
   # Android Bionic at API 23 does not expose nl_langinfo(CODESET). The
   # Android terminal environment is UTF-8, so use that directly in the TUI.
   local console_src="lib/libac/tui/console.c"
-  if [[ -f "$console_src" ]] && grep -q 'char \\* codepage = nl_langinfo(CODESET);' "$console_src"; then
-    sed -i 's/char \\* codepage = nl_langinfo(CODESET);/char * codepage = "UTF-8";/' "$console_src"
+  if [[ -f "$console_src" ]] && grep -q 'char \* codepage = nl_langinfo(CODESET);' "$console_src"; then
+    sed -i 's/char \* codepage = nl_langinfo(CODESET);/char * codepage = "UTF-8";/' "$console_src"
   else
     fatal "aircrack-ng: expected nl_langinfo call not found in $console_src"
   fi

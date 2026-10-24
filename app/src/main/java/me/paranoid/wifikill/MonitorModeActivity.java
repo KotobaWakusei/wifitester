@@ -273,7 +273,17 @@ public final class MonitorModeActivity extends BaseActivity {
                     }).start();
                     return;
                 }
-                running=true;createdMonitor=true;stopButton.setEnabled(true);
+                // QCACLD con_mode fallback uses the existing parent interface because
+                // this driver rejects a second monitor vdev. Capture on that interface.
+                if (r.output.contains("MONITOR_PARENT_MODE")) {
+                    selectedMonitor = activeInterface;
+                    createdMonitor = false;
+                    append("监听接收路径：驱动全局 con_mode；使用 " + activeInterface + "，不支持帧注入");
+                } else {
+                    selectedMonitor = "wfkmon0";
+                    createdMonitor = true;
+                }
+                running=true;stopButton.setEnabled(true);
                 capabilityState.setText(getString(R.string.monitor_started,channel.label));
                 beginCapture();
             });

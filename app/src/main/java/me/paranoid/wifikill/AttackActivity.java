@@ -356,6 +356,17 @@ public final class AttackActivity extends BaseActivity {
             if (granted) {
                 RootShell.Result devices = RootShell.run(this, "iw dev 2>&1", RootShell.TIMEOUT_SHORT);
                 detectedMonitorInterface = findMonitorInterface(devices.output);
+                if (detectedMonitorInterface.isEmpty()) {
+                    RootShell.Result conMode = RootShell.run(this,
+                            "cat /sys/module/qca_cld3_peach_v2/parameters/con_mode 2>/dev/null",
+                            RootShell.TIMEOUT_SHORT);
+                    if ("4".equals(conMode.output == null ? "" : conMode.output.trim())) {
+                        String saved = SettingsStore.defaultInterface(this);
+                        detectedMonitorInterface = !detectedRouteInterface.isEmpty()
+                                ? detectedRouteInterface
+                                : (!saved.isEmpty() ? saved : "wlan0");
+                    }
+                }
             }
             final String currentMonitorInterface = detectedMonitorInterface;
             final boolean hasMonitor = !detectedMonitorInterface.isEmpty();

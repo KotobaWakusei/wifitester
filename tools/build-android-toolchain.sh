@@ -312,8 +312,14 @@ packaged=0
 for binary in "$ASSETS"/*; do
   [[ -f "$binary" ]] || continue
   packaged=$((packaged + 1))
-  printf '%-24s %8s bytes\n' "$(basename "$binary")" "$(stat -c %s "$binary")"
-  "$READELF" -h "$binary" | grep -E 'Class:|Machine:' | sed 's/^/    /'
+  printf '%-24s %8s bytes' "$(basename "$binary")" "$(stat -c %s "$binary")"
+  if "$READELF" -h "$binary" >/dev/null 2>&1; then
+    printf '\n'
+    "$READELF" -h "$binary" | grep -E 'Class:|Machine:' | sed 's/^/    /'
+  else
+    # Scripts such as airmon-ng are valid bundled tools, but not ELF files.
+    printf ' (script/non-ELF)\n'
+  fi
 done
 if [[ $packaged -eq 0 ]]; then
   fatal "no tool was produced; see the errors above"

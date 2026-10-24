@@ -72,7 +72,7 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                 + quoteInterface(monitor) + "; " +
                 "command -v iw >/dev/null; command -v ip >/dev/null; " +
                 "if iw dev \"$MON\" info >/dev/null 2>&1; then echo 'ERROR: monitor interface already exists'; exit 7; fi; " +
-                "PHY=" + phyIndexCommand() + "; " +
+                "PHY=$(" + phyIndexCommand() + "); " +
                 "if [ -z \"$PHY\" ]; then echo PHY_UNKNOWN; fi; " +
                 "echo START_STAGE:parent-down; ip link set \"$IF\" down || { rc=$?; echo PARENT_DOWN_FAILED:$rc; exit $rc; }; " +
                 // Preserve each failure code: vendor drivers can reject one iw form

@@ -81,6 +81,7 @@ public final class AttackActivity extends BaseActivity {
     private RootProcess managed;
     private boolean rootGranted;
     private boolean monitorPresent;
+    private ToolPackageManager.DeviceMonitorCapability monitorCapability = ToolPackageManager.DeviceMonitorCapability.UNKNOWN;
     private final java.util.Map<String, String> toolPaths = new java.util.LinkedHashMap<>();
 
     @Override
@@ -369,6 +370,7 @@ public final class AttackActivity extends BaseActivity {
                 rootGranted = hasRoot;
                 monitorPresent = monitor;
                 monitorInterface = currentMonitorInterface.isEmpty() ? MONITOR_INTERFACE : currentMonitorInterface;
+                monitorCapability = toolManager.getDeviceMonitorCapability();
                 statusState.setText(hasRoot ? getString(R.string.attack_root_granted) : getString(R.string.attack_root_missing));
                 statusState.setTextColor(hasRoot ? 0xff79e0b0 : DANGER_TEXT);
                 toolState.setText(describeTools());
@@ -459,6 +461,12 @@ public final class AttackActivity extends BaseActivity {
         }
         final AttackCatalog.Module module = selectedModule();
         if (module == null) {
+            return;
+        }
+        if (module.requiresMonitor
+                && monitorCapability == ToolPackageManager.DeviceMonitorCapability.MONITOR_ONLY
+                && module.risk != AttackCatalog.Risk.PASSIVE) {
+            toast("当前驱动只有监听接收能力，不支持无线帧注入；已阻止此发送型模块。可使用被动抓包或支持注入的外接网卡。");
             return;
         }
         if (module.requiresMonitor && !monitorPresent) {

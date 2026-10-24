@@ -330,6 +330,20 @@ public final class AttackActivity extends BaseActivity {
             RootShell.Result probe = granted
                     ? RootShell.run(this, ToolCatalog.probeCommand(), RootShell.TIMEOUT_PROBE)
                     : new RootShell.Result(-1, "");
+            String detectedGateway = "";
+            String detectedRouteInterface = "";
+            if (granted) {
+                RootShell.Result route = RootShell.run(this, "ip -4 route show default 2>/dev/null", RootShell.TIMEOUT_SHORT);
+                java.util.regex.Matcher routeMatcher = java.util.regex.Pattern
+                        .compile("(?m)^default\\s+via\\s+((?:[0-9]{1,3}\\.){3}[0-9]{1,3}).*?\\bdev\\s+([A-Za-z0-9_.-]+)")
+                        .matcher(route.output == null ? "" : route.output);
+                if (routeMatcher.find()) {
+                    detectedGateway = routeMatcher.group(1);
+                    detectedRouteInterface = routeMatcher.group(2);
+                }
+            }
+            final String routeGateway = detectedGateway;
+            final String routeInterface = detectedRouteInterface;
             toolPaths.clear();
             for (ToolCatalog.Tool tool : ToolCatalog.parse(probe.output)) {
                 toolPaths.put(tool.name, tool.path);
@@ -354,7 +368,13 @@ public final class AttackActivity extends BaseActivity {
                 statusState.setText(hasRoot ? getString(R.string.attack_root_granted) : getString(R.string.attack_root_missing));
                 statusState.setTextColor(hasRoot ? 0xff79e0b0 : DANGER_TEXT);
                 toolState.setText(describeTools());
-                
+                // Fill only fields that the user has not edited; never invent a victim IP.
+                if (gatewayInput != null && gatewayInput.getText().toString().trim().isEmpty()
+                        && !routeGateway.isEmpty()) gatewayInput.setText(routeGateway);
+                if (dataInterfaceInput != null
+                        && SettingsStore.defaultInterface(this).trim().isEmpty()
+                        && !routeInterface.isEmpty()) dataInterfaceInput.setText(routeInterface);
+
                 // 显示设备监听模式支持情况
                 append("设备信息: " + toolManager.getDeviceMonitorDescription());
                 

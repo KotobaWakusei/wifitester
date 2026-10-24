@@ -259,6 +259,7 @@ public final class AttackActivity extends BaseActivity {
                         + "\n\n" + getString(R.string.attack_needs_tool_label) + module.tool
                         + getString(R.string.attack_risk_level_label) + getString(module.risk.labelRes)
                         + (module.requiresMonitor ? getString(R.string.attack_requires_monitor) : ""));
+                applyModuleDefaults(module);
             }
 
             @Override
@@ -274,10 +275,17 @@ public final class AttackActivity extends BaseActivity {
         card.addView(text(getString(R.string.attack_parameters), 16, INK, true));
         countInput = input(getString(R.string.attack_hint_count), getString(R.string.attack_frame_count));
         countInput.setInputType(InputType.TYPE_CLASS_NUMBER);
+        // An empty field was parsed as zero, which some aireplay-ng modes interpret
+        // as an unlimited run. Use a bounded lab-test default instead.
+        countInput.setText("10");
         card.addView(countInput, top(8));
         passInput = input(getString(R.string.attack_hint_passphrase), getString(R.string.attack_passphrase));
         card.addView(passInput, top(8));
         wordlistInput = input("/data/local/tmp/wordlist.txt", getString(R.string.attack_wordlist));
+        String savedWordlist = SettingsStore.wordlistPath(this);
+        if (savedWordlist != null && !savedWordlist.trim().isEmpty()) {
+            wordlistInput.setText(savedWordlist.trim());
+        }
         card.addView(wordlistInput, top(8));
         MaterialButton pick = tonalButton(getString(R.string.attack_use_saved_wordlist));
         pick.setOnClickListener(v -> wordlistInput.setText(SettingsStore.wordlistPath(this)));
@@ -644,6 +652,29 @@ public final class AttackActivity extends BaseActivity {
     }
 
     // ---- helpers ----------------------------------------------------------
+
+    /**
+     * Completes shared, non-secret fields for every module without overwriting
+     * anything the user has already typed. Target MAC/SSID and victim IP are
+     * never fabricated: they must come from the selected network/device.
+     */
+    private void applyModuleDefaults(AttackCatalog.Module module) {
+        if (module == null) return;
+        if (countInput != null && countInput.getText().toString().trim().isEmpty()) {
+            countInput.setText("10");
+        }
+        if (channelInput != null && channelInput.getText().toString().trim().isEmpty()) {
+            channelInput.setText("6");
+        }
+        if (dataInterfaceInput != null && dataInterfaceInput.getText().toString().trim().isEmpty()) {
+            String saved = SettingsStore.defaultInterface(this);
+            dataInterfaceInput.setText(saved == null || saved.trim().isEmpty() ? "wlan0" : saved.trim());
+        }
+        if (wordlistInput != null && wordlistInput.getText().toString().trim().isEmpty()) {
+            String saved = SettingsStore.wordlistPath(this);
+            if (saved != null && !saved.trim().isEmpty()) wordlistInput.setText(saved.trim());
+        }
+    }
 
     private void applyTarget(Intent intent) {
         if (intent == null) {

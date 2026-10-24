@@ -120,6 +120,12 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
         String monitor = quoteInterface(validateInterface(monitorInterface));
         String state = normalizedState(originalState);
         StringBuilder command = new StringBuilder();
+        command.append("MODE=/sys/module/qca_cld3_peach_v2/parameters/con_mode; BACKUP=/data/local/tmp/wifitester-con_mode.backup; ")
+                .append("if [ -f \"$BACKUP\" ] && [ -w \"$MODE\" ]; then ")
+                .append("ip link set ").append(parent).append(" down >/dev/null 2>&1 || true; ")
+                .append("cat \"$BACKUP\" > \"$MODE\" 2>/dev/null || true; rm -f \"$BACKUP\"; ")
+                .append("ip link set ").append(parent).append(" ").append(state).append(" >/dev/null 2>&1 || true; ")
+                .append("else ");
         if (monitorWasCreated) {
             command.append("ip link set ").append(monitor)
                     .append(" down >/dev/null 2>&1 || true; ")
@@ -127,7 +133,7 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                     .append(" del >/dev/null 2>&1 || true; ");
         }
         command.append("ip link set ").append(parent).append(" ").append(state)
-                .append(" >/dev/null 2>&1 || true");
+                .append(" >/dev/null 2>&1 || true; fi");
         return command.toString();
     }
 

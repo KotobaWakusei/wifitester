@@ -171,18 +171,29 @@ build_aircrack() {
       PKG_CONFIG_PATH="$PREFIX/openssl/lib/pkgconfig" \
       OPENSSL_PREFIX="$PREFIX/openssl"
   make -j"$(nproc)" || return 1
-  # Binaries may be symlinked and airmon-ng is shipped as a script under
-  # scripts/, so search the whole source tree and follow symlinks.
+  # Install through upstream's install rules. The linked executables are
+  # commonly emitted under .libs/ and airmon-ng is installed as a script;
+  # searching source files directly can miss these outputs or select wrappers.
+  make install || return 1
   for tool in aircrack-ng airodump-ng aireplay-ng airmon-ng; do
-    binary="$(find -L . -type f -name "$tool" -print -quit)"
-    if [[ -n "$binary" && -x "$binary" ]]; then
+    binary=""
+    for candidate in "$PREFIX/bin/$tool" "$PREFIX/sbin/$tool"; do
+      if [[ -f "$candidate" && -x "$candidate" ]]; then
+        binary="$candidate"
+        break
+      fi
+    done
+    if [[ -z "$binary" ]]; then
+      binary="$(find -L "$PREFIX" -type f -name "$tool" -print -quit)"
+    fi
+    if [[ -n "$binary" && -f "$binary" && -x "$binary" ]]; then
       install -m 0755 "$binary" "$ASSETS/$tool"
-      # airmon-ng is a shell script; llvm-strip must only process ELF files.
+      # airmon-ng is a shell script; strip only ELF executables.
       if "$READELF" -h "$ASSETS/$tool" >/dev/null 2>&1; then
         "$STRIP" "$ASSETS/$tool"
       fi
     else
-      fatal "aircrack-ng: required tool $tool was not produced"
+      fatal "aircrack-ng: required installed tool $tool missing under $PREFIX"
     fi
   done
 }
@@ -260,7 +271,10 @@ run_step "tcpdump" build_tcpdump || true
 # The remaining tools depend on the crypto backend.
 if run_step "openssl" build_openssl; then
   run_step "aircrack-ng" build_aircrack || true
-  run_step "hostapd" build_hostapd || true
+  # hostapd's nl80211 backend needs a separately cross-compiled libnl.
+  # Do not fail the entire APK build on the currently unsupported hostapd
+  # dependency; keep it absent rather than shipping a broken executable.
+  warn "skipping hostapd: Android libnl cross-build is not configured yet"
 else
   warn "skipping aircrack-ng and hostapd: no crypto backend"
 fi

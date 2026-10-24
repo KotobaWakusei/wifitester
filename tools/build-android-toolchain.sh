@@ -35,6 +35,7 @@ fi
 HOST_TAG="linux-x86_64"
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/$HOST_TAG"
 CC="$TOOLCHAIN/bin/aarch64-linux-android23-clang"
+CXX="$TOOLCHAIN/bin/aarch64-linux-android23-clang++"
 AR="$TOOLCHAIN/bin/llvm-ar"
 RANLIB="$TOOLCHAIN/bin/llvm-ranlib"
 STRIP="$TOOLCHAIN/bin/llvm-strip"
@@ -182,9 +183,10 @@ build_aircrack() {
   # arguments. CPPFLAGS is required for the OpenSSL probe (CFLAGS alone is
   # overwritten by some generated makefiles); LIBS must include both static
   # OpenSSL archives and Android's dl/pthread compatibility flags.
-  CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+  CC="$CC" CXX="$CXX" AR="$AR" RANLIB="$RANLIB" \
     CPPFLAGS="-I$PREFIX/openssl/include -I$PREFIX/include" \
     CFLAGS="-O2 -fPIC" \
+    CXXFLAGS="-O2 -fPIC" \
     LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static" \
     LIBS="-lssl -lcrypto -ldl -pthread" \
     PKG_CONFIG_PATH="$PREFIX/openssl/lib/pkgconfig" \

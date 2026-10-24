@@ -171,6 +171,13 @@ build_aircrack() {
   if [[ ! -x ./configure ]]; then
     ./autogen.sh
   fi
+  # Android uses UTF-8 for app process text. Aircrack-ng 1.7 calls
+  # nl_langinfo(CODESET) in its terminal helper, but that declaration is not
+  # available with the API-23 NDK headers. Avoid this host-locale probe for the
+  # Android build; the console helper can safely use UTF-8 directly.
+  if [[ -f lib/libac/tui/console.c ]]; then
+    sed -i 's/nl_langinfo(CODESET)/"UTF-8"/g' lib/libac/tui/console.c
+  fi
   # These are configure environment variables, not positional configure
   # arguments. CPPFLAGS is required for the OpenSSL probe (CFLAGS alone is
   # overwritten by some generated makefiles); LIBS must include both static

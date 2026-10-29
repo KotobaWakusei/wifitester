@@ -31,6 +31,22 @@ public abstract class BaseActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         applySystemBars();
+        applyKeepScreenOn();
+    }
+
+    /**
+     * Honours the "keep the screen on" preference on every screen.
+     *
+     * <p>The toggle used to affect only the settings window itself (and used
+     * addFlags(0) to "clear" the flag, which does nothing), so the option was
+     * effectively dead. Each activity now applies it when it resumes.</p>
+     */
+    protected void applyKeepScreenOn() {
+        if (SettingsStore.keepScreenOn(this)) {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
     }
 
     /**

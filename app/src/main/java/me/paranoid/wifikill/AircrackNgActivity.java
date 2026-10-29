@@ -22,6 +22,7 @@ import java.util.concurrent.Executors;
 public final class AircrackNgActivity extends BaseActivity {
     private static final int ACCENT = 0xff78b8ff;
     private final ExecutorService worker = Executors.newSingleThreadExecutor();
+    private final java.util.List<LinearLayout> commandRows = new java.util.ArrayList<>();
     private TextView statusView, outputView;
     private LinearLayout outputCard;
     private MaterialButton checkButton;
@@ -61,12 +62,18 @@ public final class AircrackNgActivity extends BaseActivity {
         addToolButton(infoCard, "aircrack-ng --version", getString(R.string.inventory_version_aircrack), "aircrack-ng --version 2>&1");
         root.addView(infoCard, UiKit.bottom(12, this));
 
+        // Self-test button to verify all bundled tools can actually run
+        addSelfTestButton(root);
+
         outputView = UiKit.logView(this);
         outputView.setText(getString(R.string.inventory_waiting));
         outputCard = UiKit.logCard(this, outputView, getString(R.string.inventory_output));
         root.addView(outputCard);
 
         setContentView(scroll);
+        // The screen exists to show the tool state; asking for a tap first was
+        // an unnecessary extra step.
+        detectTools();
     }
 
     private void addToolButton(LinearLayout parent, String label, String description, String command) {
@@ -80,13 +87,42 @@ public final class AircrackNgActivity extends BaseActivity {
         row.setOnClickListener(v -> runCommand(command));
         row.setBackground(UiKit.round(UiKit.color(this, Attrs.COLOR_SURFACE_CONTAINER), UiKit.dp(this, 12)));
         row.setPadding(UiKit.dp(this, 12), UiKit.dp(this, 10), UiKit.dp(this, 12), UiKit.dp(this, 10));
+        commandRows.add(row);
         parent.addView(row);
+    }
+
+    private void addSelfTestButton(LinearLayout parent) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, UiKit.dp(this, 8), 0, UiKit.dp(this, 8));
+        TextView name = UiKit.text(this, getString(R.string.inventory_selftest_title), 13, UiKit.WHITE, true);
+        row.addView(name);
+        TextView desc = UiKit.text(this, getString(R.string.inventory_selftest_detail), 11, UiKit.MUTED_DARK, false);
+        row.addView(desc, UiKit.top(3, this));
+        row.setOnClickListener(v -> runSelfTest());
+        row.setBackground(UiKit.round(UiKit.color(this, Attrs.COLOR_SURFACE_CONTAINER), UiKit.dp(this, 12)));
+        row.setPadding(UiKit.dp(this, 12), UiKit.dp(this, 10), UiKit.dp(this, 12), UiKit.dp(this, 10));
+        commandRows.add(row);
+        parent.addView(row);
+    }
+
+    /**
+     * A row tapped while another command is running used to do nothing at all.
+     * The rows are now greyed out for the duration of the command, so the
+     * reason the tap is ignored is visible instead of silent.
+     */
+    private void setRowsEnabled(boolean enabled) {
+        for (LinearLayout row : commandRows) {
+            row.setEnabled(enabled);
+            row.setAlpha(enabled ? 1f : 0.5f);
+        }
     }
 
     private void detectTools() {
         if (busy) return;
         busy = true;
         checkButton.setEnabled(false);
+        setRowsEnabled(false);
         statusView.setText(getString(R.string.inventory_detecting));
         worker.execute(() -> {
             String command = "printf 'UID: '; id; " + ToolCatalog.probeCommand();
@@ -96,6 +132,7 @@ public final class AircrackNgActivity extends BaseActivity {
             runOnUiThread(() -> {
                 busy = false;
                 checkButton.setEnabled(true);
+                setRowsEnabled(true);
                 if (result.code != 0 && (output == null || output.trim().isEmpty())) {
                     statusView.setText(getString(R.string.inventory_detect_failed, result.code));
                 } else {
@@ -109,8 +146,13 @@ public final class AircrackNgActivity extends BaseActivity {
     }
 
     private void runCommand(String command) {
-        if (busy) return;
+        if (busy) {
+            Toast.makeText(this, getString(R.string.inventory_busy), Toast.LENGTH_SHORT).show();
+            return;
+        }
         busy = true;
+        checkButton.setEnabled(false);
+        setRowsEnabled(false);
         outputView.setText(getString(R.string.inventory_running, command));
         worker.execute(() -> {
             Result result = runRoot(command, 8000);
@@ -119,6 +161,31 @@ public final class AircrackNgActivity extends BaseActivity {
             final int lineCount = UiKit.countLines(output);
             runOnUiThread(() -> {
                 busy = false;
+                checkButton.setEnabled(true);
+                setRowsEnabled(true);
+                UiKit.updateLogCounter(outputCard, lineCount);
+                outputView.setText(output);
+            });
+        });
+    }
+
+    private void runSelfTest() {
+        if (busy) {
+            Toast.makeText(this, getString(R.string.inventory_busy), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        busy = true;
+        checkButton.setEnabled(false);
+        setRowsEnabled(false);
+        outputView.setText(getString(R.string.inventory_running, getString(R.string.inventory_selftest_title)));
+        worker.execute(() -> {
+            Result result = runRoot(ToolCatalog.selfTestCommand(), 10000);
+            final String output = ToolCatalog.formatSelfTest(this, result.output);
+            final int lineCount = UiKit.countLines(output);
+            runOnUiThread(() -> {
+                busy = false;
+                checkButton.setEnabled(true);
+                setRowsEnabled(true);
                 UiKit.updateLogCounter(outputCard, lineCount);
                 outputView.setText(output);
             });

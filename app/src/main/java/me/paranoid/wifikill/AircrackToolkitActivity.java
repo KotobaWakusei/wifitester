@@ -100,6 +100,8 @@ public final class AircrackToolkitActivity extends BaseActivity {
         root.addView(audit, UiKit.bottom(12, this));
 
         setContentView(scroll);
+        // Show the real tool state instead of an empty "tap to detect" card.
+        detectTools();
     }
 
     private void detectTools() {

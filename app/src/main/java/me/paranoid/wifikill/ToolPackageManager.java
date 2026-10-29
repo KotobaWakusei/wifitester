@@ -28,20 +28,30 @@ public final class ToolPackageManager {
     private JSONObject config;
     
     public enum ToolPackage {
-        CORE("core", "核心工具包", Arrays.asList("tcpdump", "arpspoof"), true),
-        AIRCRACK("aircrack", "Aircrack-ng 套件", Arrays.asList("aircrack-ng", "airodump-ng", "aireplay-ng", "airmon-ng"), true);
+        CORE("core", "核心工具包", Arrays.asList("tcpdump", "arpspoof")),
+        AIRCRACK("aircrack", "Aircrack-ng 套件", Arrays.asList("aircrack-ng", "airodump-ng", "aireplay-ng", "airmon-ng"));
         // hostapd is omitted until its Android libnl dependency is bundled.
 
         public final String id;
         public final String name;
         public final List<String> tools;
-        public final boolean preInstalled;
 
-        ToolPackage(String id, String name, List<String> tools, boolean preInstalled) {
+        ToolPackage(String id, String name, List<String> tools) {
             this.id = id;
             this.name = name;
             this.tools = tools;
-            this.preInstalled = preInstalled;
+        }
+
+        /**
+         * Whether the tools ship inside the APK.
+         *
+         * <p>This is read from the packaged manifest instead of a hardcoded
+         * flag: a package that is declared as a download but can never be
+         * fetched (no public release asset) must not pretend to be built in,
+         * and a built-in package must not offer a download button.</p>
+         */
+        public boolean isPreInstalled(Context context) {
+            return new ToolPackageManager(context).isPreInstalled(this);
         }
 
         /** Total size of the tool files actually extracted for this package. */
@@ -92,6 +102,17 @@ public final class ToolPackageManager {
         } catch (Exception e) {
             e.printStackTrace();
         }
+    }
+
+    /** Reads "preinstalled" from the packaged manifest (true only for the core pack). */
+    boolean isPreInstalled(ToolPackage pkg) {
+        JSONObject info = getPackageInfo(pkg.id);
+        return info == null || info.optBoolean("preinstalled", false);
+    }
+
+    /** Whether the manifest declares a download endpoint for the package. */
+    boolean canDownload(ToolPackage pkg) {
+        return !getDownloadUrl(pkg).isEmpty();
     }
 
     /** 是否首次启动 */
@@ -160,7 +181,7 @@ public final class ToolPackageManager {
 
     /** 卸载工具包，返回被删除的字节数 */
     public long uninstallPackage(ToolPackage pkg) {
-        if (pkg.preInstalled) return 0; // 核心工具包不可卸载
+        if (isPreInstalled(pkg)) return 0; // 内置工具包不可卸载
         long freed = getSizeBytes(pkg);
         prefs.edit()
                 .remove("pkg_" + pkg.id)
@@ -202,7 +223,7 @@ public final class ToolPackageManager {
                         .apply();
             }
             // 内置工具包的文件由应用自己解包，无需下载标记即可视为已安装
-            if (pkg.preInstalled && isPackageComplete(pkg)) {
+            if (isPreInstalled(pkg) && isPackageComplete(pkg)) {
                 prefs.edit()
                         .putBoolean("pkg_" + pkg.id, true)
                         .putBoolean(KEY_VERIFIED_PREFIX + pkg.id, true)
@@ -365,6 +386,7 @@ public final class ToolPackageManager {
     public String getDownloadUrl(ToolPackage pkg) {
         JSONObject info = getPackageInfo(pkg.id);
         if (info == null) return "";
+        if (info.optBoolean("preinstalled", false)) return "";
         String url = info.optString("download_url", "").trim();
         return url.replace("{version}", BuildConfig.TOOL_PACKAGE_TAG);
     }

@@ -124,7 +124,7 @@ public class ToolInstallerService extends Service {
         if (interrupted != null) {
             currentPackage = null;
             // Only a preinstalled package is untouched: its tools ship with the APK.
-            if (!interrupted.preInstalled) {
+            if (!new ToolPackageManager(this).isPreInstalled(interrupted)) {
                 new ToolPackageManager(this).uninstallPackage(interrupted);
             }
             notifyProgress(this, interrupted.id, false, false,
@@ -184,12 +184,11 @@ public class ToolInstallerService extends Service {
             }
         } catch (Exception e) {
             Log.e(TAG, "Download failed", e);
-            String detail = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
-            message = getString(R.string.tool_download_failed, detail);
+            message = getString(R.string.tool_download_failed, describeFailure(e));
             // An exception can hit between two extracted tools (interrupted
             // service, unwritable directory); never leave a half package.
             ToolPackageManager.ToolPackage pkg = getPackageById(packageId);
-            if (pkg != null && !pkg.preInstalled) {
+            if (pkg != null && !new ToolPackageManager(this).isPreInstalled(pkg)) {
                 new ToolPackageManager(this).uninstallPackage(pkg);
             }
         } finally {
@@ -199,6 +198,43 @@ public class ToolInstallerService extends Service {
             isRunning = false;
             stopSelf();
         }
+    }
+
+    /**
+     * Turns a download/install failure into a message the user can act on.
+     *
+     * <p>A bare exception message ("Connection closed") never told anybody
+     * whether the asset is missing, the network is down or the archive is
+     * broken, so HTTP status and cause chain are mapped to explicit hints.</p>
+     */
+    private String describeFailure(Exception failure) {
+        if (failure instanceof IOException) {
+            String text = failure.getMessage();
+            if (text != null && !text.isEmpty()
+                    && !text.equals(failure.getClass().getSimpleName())) {
+                // Already a localized hint (no-network, not-found, HTTP ...).
+                return text;
+            }
+            Throwable cause = failure.getCause();
+            if (cause instanceof java.net.UnknownHostException) {
+                return getString(R.string.tool_download_dns_failed, String.valueOf(cause.getMessage()));
+            }
+            if (cause instanceof java.net.SocketTimeoutException) {
+                return getString(R.string.tool_download_timeout);
+            }
+            if (cause instanceof javax.net.ssl.SSLException) {
+                return getString(R.string.tool_download_tls_failed);
+            }
+            if (cause instanceof java.io.FileNotFoundException) {
+                return getString(R.string.tool_download_not_found, 404);
+            }
+            if (text == null || text.isEmpty()) {
+                return failure.getClass().getSimpleName();
+            }
+            return text;
+        }
+        String text = failure.getMessage();
+        return text == null || text.isEmpty() ? failure.getClass().getSimpleName() : text;
     }
 
     /** Downloads the archive into the cache directory and reports progress. */

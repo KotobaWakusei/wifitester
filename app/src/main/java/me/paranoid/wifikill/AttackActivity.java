@@ -62,6 +62,10 @@ public final class AttackActivity extends BaseActivity {
     private TextView toolState;
     private TextView logView;
     private TextView logCounter;
+    private TextView attackStatusIndicator;
+    private MaterialButton refreshEnvironment;
+    private MaterialButton wordlistPickButton;
+    private ScrollView pageScroll;
     private Spinner moduleSpinner;
     private EditText bssidInput;
     private EditText ssidInput;
@@ -75,10 +79,17 @@ public final class AttackActivity extends BaseActivity {
     private EditText wordlistInput;
     private MaterialButton startButton;
     private MaterialButton stopButton;
+    private MaterialButton autofillButton;
+    private TextView autofillState;
 
     private final StringBuilder log = new StringBuilder();
     private final List<AttackCatalog.Module> modules = AttackCatalog.modules();
     private RootProcess managed;
+    private boolean detecting;
+    private String statusMessage;
+    private int statusColor;
+    private long attackElapsedSince;
+    private android.os.Handler elapsedTicker;
     private boolean rootGranted;
     private boolean monitorPresent;
     private ToolPackageManager.DeviceMonitorCapability monitorCapability = ToolPackageManager.DeviceMonitorCapability.UNKNOWN;
@@ -99,12 +110,42 @@ public final class AttackActivity extends BaseActivity {
         buildUi();
         applyTarget(getIntent());
         detectEnvironment();
+        installBackGuard();
+    }
+
+    /**
+     * Leaving the screen while a module runs would stop the process silently
+     * (see {@link #onDestroy()}), so ask first instead of killing a test by
+     * accident.
+     */
+    private void installBackGuard() {
+        getOnBackPressedDispatcher().addCallback(this,
+                new androidx.activity.OnBackPressedCallback(true) {
+                    @Override
+                    public void handleOnBackPressed() {
+                        if (managed == null) {
+                            setEnabled(false);
+                            getOnBackPressedDispatcher().onBackPressed();
+                            return;
+                        }
+                        new MaterialAlertDialogBuilder(AttackActivity.this)
+                                .setTitle(getString(R.string.attack_leave_title))
+                                .setMessage(getString(R.string.attack_leave_detail))
+                                .setPositiveButton(getString(R.string.attack_leave_confirm), (dialog, which) -> {
+                                    setEnabled(false);
+                                    getOnBackPressedDispatcher().onBackPressed();
+                                })
+                                .setNegativeButton(getString(R.string.action_cancel), null)
+                                .show();
+                    }
+                });
     }
 
     // ---- layout -----------------------------------------------------------
 
     private void buildUi() {
         ScrollView scroll = new ScrollView(this);
+        pageScroll = scroll;
         scroll.setBackgroundColor(BG);
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
@@ -206,6 +247,7 @@ public final class AttackActivity extends BaseActivity {
         toolState = text(getString(R.string.attack_tool_checking), 12, MUTED, false);
         card.addView(toolState, top(5));
         MaterialButton refresh = tonalButton(getString(R.string.attack_recheck));
+        refreshEnvironment = refresh;
         refresh.setOnClickListener(v -> detectEnvironment());
         card.addView(refresh, top(10));
         return card;
@@ -236,6 +278,11 @@ public final class AttackActivity extends BaseActivity {
             dataInterfaceInput.setText(savedInterface);
         }
         card.addView(dataInterfaceInput, top(8));
+        autofillButton = tonalButton(getString(R.string.attack_autofill));
+        autofillButton.setOnClickListener(v -> runAutofill(true));
+        card.addView(autofillButton, top(12));
+        autofillState = text(getString(R.string.attack_autofill_hint), 12, MUTED, false);
+        card.addView(autofillState, top(6));
         return card;
     }
 
@@ -262,6 +309,7 @@ public final class AttackActivity extends BaseActivity {
                         + getString(R.string.attack_risk_level_label) + getString(module.risk.labelRes)
                         + (module.requiresMonitor ? getString(R.string.attack_requires_monitor) : ""));
                 applyModuleDefaults(module);
+                updateFieldVisibility(module);
             }
 
             @Override
@@ -290,6 +338,7 @@ public final class AttackActivity extends BaseActivity {
         }
         card.addView(wordlistInput, top(8));
         MaterialButton pick = tonalButton(getString(R.string.attack_use_saved_wordlist));
+        wordlistPickButton = pick;
         pick.setOnClickListener(v -> wordlistInput.setText(SettingsStore.wordlistPath(this)));
         card.addView(pick, top(8));
         return card;
@@ -308,10 +357,18 @@ public final class AttackActivity extends BaseActivity {
         half2.leftMargin = dp(5);
         actions.addView(stopButton, half2);
         card.addView(actions);
+        
+        // 初始状态：停止按钮禁用，启动按钮根据权限状态
         stopButton.setEnabled(false);
         startButton.setEnabled(false);
+        
         startButton.setOnClickListener(v -> confirmStart());
         stopButton.setOnClickListener(v -> stopModule());
+
+        // 添加攻击状态指示器
+        attackStatusIndicator = text("", 12, MUTED, false);
+        attackStatusIndicator.setVisibility(View.GONE);
+        card.addView(attackStatusIndicator, top(8));
 
         MaterialButton analyze = tonalButton(getString(R.string.attack_analyze_frames));
         analyze.setOnClickListener(v -> startActivity(new Intent(this, FrameAnalysisActivity.class)));
@@ -325,27 +382,23 @@ public final class AttackActivity extends BaseActivity {
     // ---- environment ------------------------------------------------------
 
     private void detectEnvironment() {
+        // Re-checking while a probe is in flight used to start a second su
+        // session; the two answers could then overwrite each other.
+        if (detecting) return;
+        detecting = true;
+        if (refreshEnvironment != null) refreshEnvironment.setEnabled(false);
         statusState.setText(getString(R.string.attack_detect_root));
         toolState.setText(getString(R.string.attack_detect_tools));
+        startButton.setEnabled(false);
         new Thread(() -> {
+            // Extract the bundled toolchain before probing. On a fresh install
+            // the first screen visited may be this workbench, and without the
+            // extraction every bundled tool would look missing.
+            new BundledToolchain(this).install();
             boolean granted = RootShell.hasRoot(this);
             RootShell.Result probe = granted
                     ? RootShell.run(this, ToolCatalog.probeCommand(), RootShell.TIMEOUT_PROBE)
                     : new RootShell.Result(-1, "");
-            String detectedGateway = "";
-            String detectedRouteInterface = "";
-            if (granted) {
-                RootShell.Result route = RootShell.run(this, "ip -4 route show default 2>/dev/null", RootShell.TIMEOUT_SHORT);
-                java.util.regex.Matcher routeMatcher = java.util.regex.Pattern
-                        .compile("(?m)^default\\s+via\\s+((?:[0-9]{1,3}\\.){3}[0-9]{1,3}).*?\\bdev\\s+([A-Za-z0-9_.-]+)")
-                        .matcher(route.output == null ? "" : route.output);
-                if (routeMatcher.find()) {
-                    detectedGateway = routeMatcher.group(1);
-                    detectedRouteInterface = routeMatcher.group(2);
-                }
-            }
-            final String routeGateway = detectedGateway;
-            final String routeInterface = detectedRouteInterface;
             toolPaths.clear();
             for (ToolCatalog.Tool tool : ToolCatalog.parse(probe.output)) {
                 toolPaths.put(tool.name, tool.path);
@@ -362,9 +415,7 @@ public final class AttackActivity extends BaseActivity {
                             RootShell.TIMEOUT_SHORT);
                     if ("4".equals(conMode.output == null ? "" : conMode.output.trim())) {
                         String saved = SettingsStore.defaultInterface(this);
-                        detectedMonitorInterface = !detectedRouteInterface.isEmpty()
-                                ? detectedRouteInterface
-                                : (!saved.isEmpty() ? saved : "wlan0");
+                        detectedMonitorInterface = saved.isEmpty() ? "wlan0" : saved;
                     }
                 }
             }
@@ -373,27 +424,34 @@ public final class AttackActivity extends BaseActivity {
             
             // 检查设备监听模式支持情况
             ToolPackageManager toolManager = new ToolPackageManager(this);
-            ToolPackageManager.DeviceMonitorCapability monitorCapability = toolManager.getDeviceMonitorCapability();
-            
+            // Captured by the UI lambda below: must be final, and must not
+            // shadow the field of the same name.
+            final ToolPackageManager.DeviceMonitorCapability deviceCapability =
+                    toolManager.getDeviceMonitorCapability();
+
             final boolean hasRoot = granted;
             final boolean monitor = hasMonitor;
             runOnUiThread(() -> {
+                detecting = false;
+                if (refreshEnvironment != null) refreshEnvironment.setEnabled(true);
                 rootGranted = hasRoot;
                 monitorPresent = monitor;
                 monitorInterface = currentMonitorInterface.isEmpty() ? MONITOR_INTERFACE : currentMonitorInterface;
-                monitorCapability = toolManager.getDeviceMonitorCapability();
+                monitorCapability = deviceCapability;
                 statusState.setText(hasRoot ? getString(R.string.attack_root_granted) : getString(R.string.attack_root_missing));
                 statusState.setTextColor(hasRoot ? 0xff79e0b0 : DANGER_TEXT);
                 toolState.setText(describeTools());
-                // Fill only fields that the user has not edited; never invent a victim IP.
-                if (gatewayInput != null && gatewayInput.getText().toString().trim().isEmpty()
-                        && !routeGateway.isEmpty()) gatewayInput.setText(routeGateway);
-                if (dataInterfaceInput != null
-                        && SettingsStore.defaultInterface(this).trim().isEmpty()
-                        && !routeInterface.isEmpty()) dataInterfaceInput.setText(routeInterface);
+
+                // Fill only fields that the user has not edited; never invent a target.
+                if (SettingsStore.attackAutofill(this)) {
+                    runAutofill(hasRoot);
+                } else if (autofillButton != null) {
+                    autofillButton.setEnabled(false);
+                    autofillState.setText(getString(R.string.attack_autofill_disabled));
+                }
 
                 // 显示设备监听模式支持情况
-                append("设备信息: " + toolManager.getDeviceMonitorDescription());
+                append(getString(R.string.attack_device_info, describeCapability(deviceCapability)));
                 
                 boolean authorized = SettingsStore.attackAuthorized(this);
                 startButton.setEnabled(hasRoot && authorized);
@@ -408,10 +466,10 @@ public final class AttackActivity extends BaseActivity {
                         : getString(R.string.attack_no_monitor, MONITOR_INTERFACE));
                 
                 // 根据设备能力提供功能建议
-                if (monitorCapability == ToolPackageManager.DeviceMonitorCapability.MONITOR_ONLY) {
-                    append("注意: 当前设备仅支持监听模式，不支持帧注入功能");
-                } else if (monitorCapability == ToolPackageManager.DeviceMonitorCapability.NO_MONITOR) {
-                    append("警告: 当前设备不支持Wi-Fi监听模式，建议使用OTG外接网卡");
+                if (deviceCapability == ToolPackageManager.DeviceMonitorCapability.MONITOR_ONLY) {
+                    append(getString(R.string.attack_capability_monitor_only));
+                } else if (deviceCapability == ToolPackageManager.DeviceMonitorCapability.NO_MONITOR) {
+                    append(getString(R.string.attack_capability_no_monitor));
                 }
             });
         }, "wifitester-attack-detect").start();
@@ -434,6 +492,23 @@ public final class AttackActivity extends BaseActivity {
         return output.contains("Interface " + MONITOR_INTERFACE) ? MONITOR_INTERFACE : "";
     }
 
+    /** Localised description of the capability the driver is expected to offer. */
+    private String describeCapability(ToolPackageManager.DeviceMonitorCapability capability) {
+        switch (capability) {
+            case FULL_MONITOR_INJECTION:
+                return getString(R.string.attack_capability_full);
+            case MONITOR_ONLY:
+                return getString(R.string.attack_capability_monitor_only);
+            case NO_MONITOR:
+                return getString(R.string.attack_capability_no_monitor);
+            case REQUIRES_OTG:
+                return getString(R.string.attack_capability_requires_otg);
+            case UNKNOWN:
+            default:
+                return getString(R.string.attack_capability_unknown);
+        }
+    }
+
     private String describeTools() {
         StringBuilder text = new StringBuilder(getString(R.string.attack_tools_header));
         ToolPackageManager toolManager = new ToolPackageManager(this);
@@ -441,8 +516,12 @@ public final class AttackActivity extends BaseActivity {
         for (String name : required) {
             String path = toolPaths.get(name);
             boolean present = path != null && path.startsWith("/");
-            boolean installed = toolManager.isToolAvailable(name);
-            
+            // iw/ip and hostapd are not part of a downloadable package; for
+            // those only the actual detection result matters. Requiring a
+            // package marked "installed" made system tools show as missing.
+            boolean packaged = isPackagedTool(toolManager, name);
+            boolean installed = !packaged || toolManager.isToolAvailable(name);
+
             if (text.length() > 5) {
                 text.append("  ");
             }
@@ -457,6 +536,14 @@ public final class AttackActivity extends BaseActivity {
         }
         text.append(getString(R.string.attack_missing_command_hint));
         return text.toString();
+    }
+
+    /** Whether any downloadable package claims to provide this tool. */
+    private static boolean isPackagedTool(ToolPackageManager toolManager, String tool) {
+        for (ToolPackageManager.ToolPackage pkg : toolManager.getAllPackages()) {
+            if (pkg.tools.contains(tool)) return true;
+        }
+        return false;
     }
 
     // ---- execution --------------------------------------------------------
@@ -477,7 +564,7 @@ public final class AttackActivity extends BaseActivity {
         if (module.requiresMonitor
                 && monitorCapability == ToolPackageManager.DeviceMonitorCapability.MONITOR_ONLY
                 && module.risk != AttackCatalog.Risk.PASSIVE) {
-            toast("当前驱动只有监听接收能力，不支持无线帧注入；已阻止此发送型模块。可使用被动抓包或支持注入的外接网卡。");
+            toast(getString(R.string.attack_monitor_only_blocked));
             return;
         }
         if (module.requiresMonitor && !monitorPresent) {
@@ -493,38 +580,71 @@ public final class AttackActivity extends BaseActivity {
         if (!isToolAvailable(module.tool)) {
             ToolPackageManager toolManager = new ToolPackageManager(this);
             String toolName = module.tool;
-            
-            if (!toolManager.isToolAvailable(toolName)) {
-                // 工具未安装，提示用户下载
+            boolean packaged = isPackagedTool(toolManager, toolName);
+            boolean packageInstalled = packaged && toolManager.isToolAvailable(toolName);
+
+            if (!packaged) {
+                // iw/ip/hostapd are not shipped in a package; pretending a
+                // download exists left the user tapping a button that did
+                // nothing. Say plainly that the command has to be provided.
                 new MaterialAlertDialogBuilder(this)
                         .setTitle(getString(R.string.attack_needs_tool_title))
-                        .setMessage(getString(R.string.attack_needs_tool_download, toolName))
-                        .setPositiveButton(getString(R.string.action_download), (dialog, which) -> {
-                            // 尝试下载对应的工具包
-                            for (ToolPackageManager.ToolPackage pkg : toolManager.getAllPackages()) {
-                                if (pkg.tools.contains(toolName)) {
-                                    ToolInstallerService.start(this, pkg);
-                                    toast(getString(R.string.tool_download_started, pkg.name));
-                                    break;
-                                }
-                            }
-                        })
-                        .setNeutralButton(getString(R.string.action_open_toolkit), (dialog, which) ->
+                        .setMessage(getString(R.string.attack_needs_tool, toolName))
+                        .setPositiveButton(getString(R.string.action_open_toolkit), (dialog, which) ->
                                 startActivity(new Intent(this, AircrackNgActivity.class)))
                         .setNegativeButton(getString(R.string.action_cancel), null)
                         .show();
                 return;
-            } else {
-                // 工具已安装但未找到，可能是路径问题
-                new MaterialAlertDialogBuilder(this)
-                        .setTitle(getString(R.string.attack_tool_missing_title))
-                        .setMessage(getString(R.string.attack_tool_missing, toolName))
-                        .setPositiveButton(getString(R.string.action_recheck), (dialog, which) ->
-                                detectEnvironment())
-                        .setNegativeButton(getString(R.string.action_cancel), null)
-                        .show();
+            }
+            if (!packageInstalled) {
+                // The package exists but is not complete. Only offer a download
+                // when the manifest actually declares one; the bundled packs
+                // are extracted from the APK and have no download URL.
+                ToolPackageManager.ToolPackage targetPackage = null;
+                for (ToolPackageManager.ToolPackage pkg : toolManager.getAllPackages()) {
+                    if (pkg.tools.contains(toolName)) {
+                        targetPackage = pkg;
+                        break;
+                    }
+                }
+                final ToolPackageManager.ToolPackage downloadPackage =
+                        targetPackage != null && toolManager.canDownload(targetPackage)
+                                ? targetPackage : null;
+                if (downloadPackage != null) {
+                    final ToolPackageManager.ToolPackage pkg = downloadPackage;
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle(getString(R.string.attack_needs_tool_title))
+                            .setMessage(getString(R.string.attack_needs_tool_download, toolName))
+                            .setPositiveButton(getString(R.string.action_download), (dialog, which) -> {
+                                ToolInstallerService.start(this, pkg);
+                                toast(getString(R.string.tool_download_started, pkg.name));
+                            })
+                            .setNeutralButton(getString(R.string.action_open_toolkit), (dialog, which) ->
+                                    startActivity(new Intent(this, AircrackNgActivity.class)))
+                            .setNegativeButton(getString(R.string.action_cancel), null)
+                            .show();
+                } else {
+                    new MaterialAlertDialogBuilder(this)
+                            .setTitle(getString(R.string.attack_tool_missing_title))
+                            .setMessage(getString(R.string.attack_tool_missing, toolName))
+                            .setPositiveButton(getString(R.string.action_recheck), (dialog, which) ->
+                                    detectEnvironment())
+                            .setNeutralButton(getString(R.string.action_open_toolkit), (dialog, which) ->
+                                    startActivity(new Intent(this, AircrackNgActivity.class)))
+                            .setNegativeButton(getString(R.string.action_cancel), null)
+                            .show();
+                }
                 return;
             }
+            // The package is installed but the probe did not find the command.
+            new MaterialAlertDialogBuilder(this)
+                    .setTitle(getString(R.string.attack_tool_missing_title))
+                    .setMessage(getString(R.string.attack_tool_missing, toolName))
+                    .setPositiveButton(getString(R.string.action_recheck), (dialog, which) ->
+                            detectEnvironment())
+                    .setNegativeButton(getString(R.string.action_cancel), null)
+                    .show();
+            return;
         }
 
         final String command;
@@ -667,26 +787,68 @@ public final class AttackActivity extends BaseActivity {
     private void launch(AttackCatalog.Module module, String command) {
         append("===== " + getString(module.titleRes) + " =====");
         append(getString(R.string.attack_command_running, command));
+        
+        // 更新UI状态
         startButton.setEnabled(false);
         stopButton.setEnabled(true);
+        startButton.setText(getString(R.string.attack_start_running));
+        stopButton.setText(getString(R.string.attack_stop));
+        moduleSpinner.setEnabled(false);
+        startElapsed();
+        updateAttackStatus(getString(R.string.attack_status_running), ACCENT);
+        toast(getString(R.string.attack_started_toast));
+        // A sleeping CPU would stall the injected frames; keep the screen on
+        // for exactly as long as the module runs.
+        getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        // Bring the live output into view: the first lines are the evidence
+        // that the module actually started.
+        if (pageScroll != null) pageScroll.post(() -> pageScroll.fullScroll(View.FOCUS_DOWN));
+        
+        // 添加启动提示
+        append(getString(R.string.attack_module_started, module.titleRes));
 
         managed = RootProcess.start(this, command, new RootProcess.OutputListener() {
             @Override
             public void onLine(String line) {
                 append(line);
+                // 实时更新攻击状态
+                if (line.contains("sent") || line.contains("packets")) {
+                    updateAttackStatus(getString(R.string.attack_status_sending), ACCENT);
+                }
             }
 
             @Override
             public void onFinished(int exitCode) {
                 append(getString(R.string.attack_module_finished, exitCode));
+                String statusMessage;
+                int statusColor;
+                
+                if (exitCode == 0) {
+                    statusMessage = getString(R.string.attack_status_success);
+                    statusColor = 0xff79e0b0; // 绿色
+                } else if (exitCode == 130 || exitCode == 143) {
+                    statusMessage = getString(R.string.attack_status_stopped);
+                    statusColor = WARN_TEXT; // 黄色
+                } else {
+                    statusMessage = getString(R.string.attack_status_failed, exitCode);
+                    statusColor = DANGER_TEXT; // 红色
+                }
+                
                 runOnUiThread(() -> {
+                    stopElapsed();
+                    getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
                     startButton.setEnabled(rootGranted
                             && SettingsStore.attackAuthorized(AttackActivity.this));
+                    startButton.setText(getString(R.string.attack_start));
+                    stopButton.setText(getString(R.string.attack_stop));
                     stopButton.setEnabled(false);
+                    moduleSpinner.setEnabled(true);
                     managed = null;
+                    updateAttackStatus(statusMessage, statusColor);
                 });
             }
         });
+        
         if (managed != null) {
             append(getString(R.string.attack_process_started, managed.innerPid()));
         }
@@ -698,20 +860,216 @@ public final class AttackActivity extends BaseActivity {
             toast(getString(R.string.attack_no_running_module));
             return;
         }
+        
         append(getString(R.string.attack_stopping));
+        updateAttackStatus(getString(R.string.attack_status_stopping), WARN_TEXT);
+        stopButton.setEnabled(false);
+        stopButton.setText(getString(R.string.attack_stop_stopping));
+        
         new Thread(() -> {
             process.stop();
             runOnUiThread(() -> {
                 append(getString(R.string.attack_module_stopped));
                 managed = null;
+                stopElapsed();
+                stopButton.setText(getString(R.string.attack_stop));
                 stopButton.setEnabled(false);
+                startButton.setText(getString(R.string.attack_start));
                 startButton.setEnabled(rootGranted
                         && SettingsStore.attackAuthorized(AttackActivity.this));
+                moduleSpinner.setEnabled(true);
+                updateAttackStatus(null, MUTED);
             });
         }, "wifitester-attack-stop").start();
     }
 
+    // ---- target autofill --------------------------------------------------
+
+    /**
+     * Fills the target fields from what the device actually reports.
+     *
+     * <p>Inputs come from <em>both</em> worlds on purpose: the route table, the
+     * address and the ARP cache need root, while the scan list is available to
+     * any app with the location permission. Only empty fields are written, so
+     * a value the user typed (or a target passed from the network list) is
+     * never replaced. Nothing is guessed: a field without evidence stays
+     * empty and the reason is shown under the button.</p>
+     */
+    private void runAutofill(boolean includeLocal) {
+        if (autofillButton == null) return;
+        final String preferredBssid = bssidInput.getText().toString().trim();
+        final String preferredSsid = ssidInput.getText().toString().trim();
+        if (includeLocal) {
+            autofillButton.setEnabled(false);
+            autofillState.setText(getString(R.string.attack_autofill_running));
+        }
+        new Thread(() -> {
+            AttackTargetResolver.LocalNetwork network = new AttackTargetResolver.LocalNetwork();
+            String neighbourOutput = "";
+            if (includeLocal) {
+                RootShell.Result route = RootShell.run(this,
+                        "ip -4 route show table all 2>/dev/null", RootShell.TIMEOUT_SHORT);
+                RootShell.Result address = RootShell.run(this,
+                        "ip -4 addr show 2>/dev/null", RootShell.TIMEOUT_SHORT);
+                network = AttackTargetResolver.parseLocalNetwork(route.output, address.output);
+                String iface = network.routeInterface.isEmpty()
+                    ? dataInterfaceInput.getText().toString().trim() : network.routeInterface;
+                if (iface.matches("[A-Za-z0-9_.-]{1,15}")) {
+                    RootShell.Result neighbours = RootShell.run(this,
+                            "ip -4 neigh show dev " + iface + " 2>/dev/null", RootShell.TIMEOUT_SHORT);
+                    neighbourOutput = neighbours.output;
+                }
+            }
+            List<AttackTargetResolver.AccessPoint> scanned = scanAccessPoints();
+            final AttackTargetResolver.LocalNetwork local = network;
+            final List<AttackTargetResolver.AccessPoint> accessPoints = scanned;
+            final String neighbours = neighbourOutput;
+            runOnUiThread(() -> applyAutofill(local, neighbours, accessPoints,
+                    preferredBssid, preferredSsid, includeLocal));
+        }, "wifitester-attack-autofill").start();
+    }
+
+    /**
+     * Returns the visible access points. The framework scan needs no root but
+     * is rate limited; "iw scan" is more complete and works from the monitor
+     * mode toolchain. Both are best effort and may return an empty list.
+     */
+    private List<AttackTargetResolver.AccessPoint> scanAccessPoints() {
+        try {
+            android.net.wifi.WifiManager wifi = (android.net.wifi.WifiManager)
+                    getApplicationContext().getSystemService(android.content.Context.WIFI_SERVICE);
+            if (wifi != null) {
+                List<android.net.wifi.ScanResult> results = wifi.getScanResults();
+                if (results != null && !results.isEmpty()) {
+                    List<AttackTargetResolver.AccessPoint> converted = new ArrayList<>();
+                    for (android.net.wifi.ScanResult result : results) {
+                        String name = result.SSID == null ? "" : result.SSID.trim();
+                        if (name.isEmpty() || result.BSSID == null) continue;
+                        converted.add(new AttackTargetResolver.AccessPoint(
+                                result.BSSID.toLowerCase(Locale.US), name,
+                                frequencyToChannel(result.frequency), result.level));
+                    }
+                    if (!converted.isEmpty()) return converted;
+                }
+            }
+        } catch (SecurityException denied) {
+            // Location/Nearby permission was not granted; fall through to iw.
+        } catch (Exception ignored) {
+            // A vendor scan service can fail; iw remains as fallback.
+        }
+        String iface = dataInterfaceInput == null ? "" : dataInterfaceInput.getText().toString().trim();
+        if (!iface.matches("[A-Za-z0-9_.-]{1,15}")) return new ArrayList<>();
+        RootShell.Result scan = RootShell.run(this,
+                "iw dev " + iface + " scan 2>/dev/null", RootShell.TIMEOUT_LONG);
+        return AttackTargetResolver.parseScan(scan.output);
+    }
+
+    private static int frequencyToChannel(int frequency) {
+        if (frequency == 2484) return 14;
+        if (frequency >= 2412 && frequency < 2484) return (frequency - 2407) / 5;
+        if (frequency >= 5955) return (frequency - 5950) / 5;
+        if (frequency >= 5000 && frequency < 5955) return (frequency - 5000) / 5;
+        return 0;
+    }
+
+    private void applyAutofill(AttackTargetResolver.LocalNetwork local, String neighbourOutput,
+                               List<AttackTargetResolver.AccessPoint> accessPoints,
+                               String preferredBssid, String preferredSsid, boolean includeLocal) {
+        if (autofillButton != null) autofillButton.setEnabled(true);
+        int filled = 0;
+        StringBuilder notes = new StringBuilder();
+
+        if (includeLocal && local.hasGateway()) {
+            filled += fillIfEmpty(gatewayInput, local.gateway);
+            if (SettingsStore.defaultInterface(this).trim().isEmpty()) {
+                filled += fillIfEmpty(dataInterfaceInput, local.routeInterface);
+            }
+            List<String> neighbours = AttackTargetResolver.parseNeighbours(neighbourOutput, local.localAddress);
+            String victim = AttackTargetResolver.chooseVictim(local, neighbours);
+            if (!victim.isEmpty()) filled += fillIfEmpty(victimInput, victim);
+            if (neighbours.isEmpty() && victim.isEmpty()) {
+                notes.append(getString(R.string.attack_autofill_no_neighbours)).append('\n');
+            }
+        } else if (includeLocal) {
+            notes.append(getString(R.string.attack_autofill_no_gateway)).append('\n');
+        }
+
+        AttackTargetResolver.AccessPoint target =
+                AttackTargetResolver.chooseTarget(accessPoints, preferredBssid, preferredSsid);
+        if (target != null) {
+            filled += fillIfEmpty(bssidInput, target.bssid);
+            filled += fillIfEmpty(ssidInput, target.ssid);
+            if (target.channel > 0) {
+                String current = channelInput.getText().toString().trim();
+                // "6" is the factory default, not a user choice.
+                if (current.isEmpty() || current.equals("6")) {
+                    if (!current.equals(String.valueOf(target.channel))) {
+                        channelInput.setText(String.valueOf(target.channel));
+                        filled++;
+                    }
+                }
+            }
+        } else {
+            notes.append(getString(R.string.attack_autofill_no_scan)).append('\n');
+        }
+
+        if (filled == 0 && notes.length() == 0) {
+            notes.append(getString(R.string.attack_autofill_nothing)).append('\n');
+        }
+        autofillState.setText(getString(R.string.attack_autofill_result, filled)
+                + (notes.length() == 0 ? "" : "\n" + notes.toString().trim()));
+        append(getString(R.string.attack_autofill_log, filled));
+    }
+
+    /** Writes the value only when the field is empty; returns 1 when it did. */
+    private int fillIfEmpty(EditText field, String value) {
+        if (field == null || value == null || value.trim().isEmpty()) return 0;
+        if (!field.getText().toString().trim().isEmpty()) return 0;
+        field.setText(value.trim());
+        return 1;
+    }
+
     // ---- helpers ----------------------------------------------------------
+
+    /**
+     * Shows only the target and parameter fields the selected module actually
+     * reads.
+     *
+     * <p>The workbench used to display eight inputs at once, so most of them
+     * looked mandatory even though a deauthentication run only needs a BSSID
+     * and a count. Values are kept in the views, so switching modules back and
+     * forth never loses what was typed.</p>
+     */
+    private void updateFieldVisibility(AttackCatalog.Module module) {
+        if (module == null) return;
+        String id = module.id;
+        boolean deauth = AttackCatalog.ID_DEAUTH.equals(id);
+        boolean beacon = AttackCatalog.ID_BEACON.equals(id);
+        boolean auth = AttackCatalog.ID_AUTH.equals(id);
+        boolean handshake = AttackCatalog.ID_HANDSHAKE.equals(id);
+        boolean crack = AttackCatalog.ID_CRACK.equals(id);
+        boolean evilTwin = AttackCatalog.ID_EVIL_TWIN.equals(id);
+        boolean arp = AttackCatalog.ID_ARP_SPOOF.equals(id);
+
+        boolean usesTarget = !crack && !arp;
+        show(bssidInput, usesTarget);
+        show(ssidInput, evilTwin);
+        show(channelInput, handshake || evilTwin);
+        show(clientInput, deauth);
+        show(countInput, deauth || beacon || auth);
+        show(gatewayInput, arp);
+        show(victimInput, arp);
+        show(dataInterfaceInput, arp);
+        show(passInput, evilTwin);
+        show(wordlistInput, crack);
+        show(wordlistPickButton, crack);
+        show(autofillButton, usesTarget || arp);
+        show(autofillState, usesTarget || arp);
+    }
+
+    private static void show(View view, boolean visible) {
+        if (view != null) view.setVisibility(visible ? View.VISIBLE : View.GONE);
+    }
 
     /**
      * Completes shared, non-secret fields for every module without overwriting
@@ -723,13 +1081,9 @@ public final class AttackActivity extends BaseActivity {
         if (countInput != null && countInput.getText().toString().trim().isEmpty()) {
             countInput.setText("10");
         }
-        if (channelInput != null && channelInput.getText().toString().trim().isEmpty()) {
-            channelInput.setText("6");
-        }
-        if (dataInterfaceInput != null && dataInterfaceInput.getText().toString().trim().isEmpty()) {
-            String saved = SettingsStore.defaultInterface(this);
-            dataInterfaceInput.setText(saved == null || saved.trim().isEmpty() ? "wlan0" : saved.trim());
-        }
+        // Leave the channel empty: a value is only written when the scanned
+        // access point actually reports one, so an untouched "6" can never
+        // silently point the module at the wrong channel.
         if (wordlistInput != null && wordlistInput.getText().toString().trim().isEmpty()) {
             String saved = SettingsStore.wordlistPath(this);
             if (saved != null && !saved.trim().isEmpty()) wordlistInput.setText(saved.trim());
@@ -815,7 +1169,74 @@ public final class AttackActivity extends BaseActivity {
                 logView.setText(text);
             }
             updateLogCounter();
+            followLogTail();
         });
+    }
+
+    /**
+     * Keeps the newest output visible, but only when the user is already
+     * at the bottom: someone reading earlier lines is not yanked away.
+     */
+    private void followLogTail() {
+        if (pageScroll == null || logView == null) return;
+        View content = pageScroll.getChildAt(0);
+        if (content == null) return;
+        int viewportBottom = pageScroll.getScrollY() + pageScroll.getHeight();
+        int distanceToBottom = content.getBottom() - viewportBottom;
+        if (distanceToBottom <= dp(220)) {
+            pageScroll.post(() -> pageScroll.fullScroll(View.FOCUS_DOWN));
+        }
+    }
+
+    /** 更新攻击状态指示器 */
+    private void updateAttackStatus(String message, int color) {
+        statusMessage = message;
+        statusColor = color;
+        renderAttackStatus();
+    }
+
+    /** 把当前状态和已运行时长写到状态行上。 */
+    private void renderAttackStatus() {
+        if (attackStatusIndicator == null) return;
+        if (statusMessage == null || statusMessage.trim().isEmpty()) {
+            attackStatusIndicator.setVisibility(View.GONE);
+            return;
+        }
+        attackStatusIndicator.setVisibility(View.VISIBLE);
+        attackStatusIndicator.setText(attackElapsedSince > 0L
+                ? getString(R.string.attack_status_elapsed, statusMessage, elapsedLabel())
+                : statusMessage);
+        attackStatusIndicator.setTextColor(statusColor);
+    }
+
+    private String elapsedLabel() {
+        long seconds = Math.max(0L, (System.currentTimeMillis() - attackElapsedSince) / 1000L);
+        return String.format(Locale.US, "%02d:%02d", seconds / 60L, seconds % 60L);
+    }
+
+    /** Starts the "running for mm:ss" ticker shown next to the state. */
+    private void startElapsed() {
+        stopElapsed();
+        attackElapsedSince = System.currentTimeMillis();
+        renderAttackStatus();
+        elapsedTicker = new android.os.Handler(getMainLooper());
+        elapsedTicker.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (attackElapsedSince <= 0L) return;
+                renderAttackStatus();
+                elapsedTicker.postDelayed(this, 1000L);
+            }
+        }, 1000L);
+    }
+
+    /** Stops the ticker and hides the elapsed time. */
+    private void stopElapsed() {
+        attackElapsedSince = 0L;
+        if (elapsedTicker != null) {
+            elapsedTicker.removeCallbacksAndMessages(null);
+            elapsedTicker = null;
+        }
     }
 
     private static int parseInt(String value, int fallback) {
@@ -881,7 +1302,19 @@ public final class AttackActivity extends BaseActivity {
     }
 
     @Override
+    protected void onResume() {
+        super.onResume();
+        // A running module must keep the CPU awake even if the global
+        // preference is off; applyKeepScreenOn() would have cleared it.
+        if (managed != null) {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    @Override
     protected void onDestroy() {
+        stopElapsed();
+        getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         RootProcess process = managed;
         if (process != null) {
             process.stop();

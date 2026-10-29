@@ -24,6 +24,12 @@ public final class BundledToolchain {
      * instances could race on the same <name>"" .new"" temp files.
      */
     private static volatile InstallResult cachedInstall;
+    /**
+     * Process-wide link prelude. A new BundledToolchain is constructed for
+     * every shell command; the instance version of this cache was therefore
+     * re-scanning the binaries from flash on each {@code su -c} call.
+     */
+    private static volatile String aircrackPathPrelude;
     private final Context context;
     private final File root;
     private final File bin;
@@ -39,6 +45,16 @@ public final class BundledToolchain {
     public String getAbi() { return ABI; }
     public File getBinDir() { return bin; }
     public File getLibDir() { return lib; }
+
+    /**
+     * Re-extracts the packaged tools even when this process already succeeded
+     * once. Used by the repair action for a toolchain that was deleted or
+     * truncated behind the app's back.
+     */
+    public synchronized InstallResult reinstall() {
+        cachedInstall = null;
+        return install();
+    }
 
     /** Copies packaged assets to app-private storage and marks executable files executable. */
     public synchronized InstallResult install() {
@@ -118,8 +134,93 @@ public final class BundledToolchain {
     public String shellEnvironment() {
         String b = quote(bin.getAbsolutePath());
         String l = quote(lib.getAbsolutePath());
-        return "export PATH=" + b + ":$PATH; export LD_LIBRARY_PATH=" + l
-                + ":\u0024{LD_LIBRARY_PATH:-}; ";
+        return aircrackPathPrelude() + "export PATH=" + b + ":$PATH; export LD_LIBRARY_PATH=" + l
+                + ":\u0024{LD_LIBRARY_PATH:-}; export OPENSSL_CONF=" + l + "/openssl.cnf; ";
+    }
+
+    /**
+     * Root-side mkdir/ln commands for the absolute dlopen() paths embedded in
+     * aircrack-ng binaries (for example {@code /tmp/tmp.XXX/prefix/lib}).
+     *
+     * <p>The app-UID install step cannot create directories under {@code /tmp};
+     * the shell environment, by contrast, is always evaluated inside
+     * {@code su -c}. Emitting the links here is what actually makes aircrack-ng
+     * load the bundled crypto engine on a stock device.</p>
+     */
+    private String aircrackPathPrelude() {
+        String cached = aircrackPathPrelude;
+        if (cached != null) return cached;
+        StringBuilder commands = new StringBuilder();
+        try {
+            for (String buildPath : buildPathPrefixes()) {
+                commands.append("mkdir -p ").append(quote(buildPath)).append(" 2>/dev/null; ");
+                for (String name : new String[]{"libaircrack-ce-wpa.so",
+                        "libaircrack-osdep-1.7.0.so"}) {
+                    java.io.File target = new java.io.File(lib, name);
+                    if (!target.isFile()) continue;
+                    commands.append("ln -sf ").append(quote(target.getAbsolutePath()))
+                            .append(' ').append(quote(new java.io.File(buildPath, name).getAbsolutePath()))
+                            .append(" 2>/dev/null; ");
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // A scan failure must never break the tool environment.
+        }
+        String result = commands.toString();
+        aircrackPathPrelude = result;
+        return result;
+    }
+
+    /** Unique build-time lib directories found in the bundled aircrack binaries. */
+    private java.util.List<String> buildPathPrefixes() {
+        java.util.LinkedHashSet<String> prefixes = new java.util.LinkedHashSet<>();
+        java.io.File[] binaries = bin.listFiles((dir, name) -> {
+            String lower = name.toLowerCase(java.util.Locale.ROOT);
+            return lower.startsWith("aircrack") || lower.startsWith("airodump")
+                    || lower.startsWith("aireplay") || lower.startsWith("airmon");
+        });
+        if (binaries == null) return new java.util.ArrayList<>();
+        java.util.regex.Pattern pattern =
+                java.util.regex.Pattern.compile("/tmp/tmp\\.[A-Za-z0-9]+/prefix/lib");
+        for (java.io.File binFile : binaries) {
+            try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(binFile, "r")) {
+                long length = raf.length();
+                if (length > 5_000_000) continue; // skip overly large files
+                byte[] data = new byte[(int) length];
+                raf.readFully(data);
+                String content = new String(data, java.nio.charset.StandardCharsets.ISO_8859_1);
+                java.util.regex.Matcher matcher = pattern.matcher(content);
+                while (matcher.find()) prefixes.add(matcher.group());
+            } catch (Exception ignored) {
+                // Unreadable binaries simply contribute no paths.
+            }
+        }
+        return new java.util.ArrayList<>(prefixes);
+    }
+
+    /**
+     * Shell expression for a tool that actually runs on this device.
+     *
+     * <p>The bundled binaries are cross-compiled; a build with an under-aligned
+     * TLS segment is rejected by Bionic with "executable's TLS segment is
+     * underaligned" even though the file is complete and executable. Falling
+     * back to the system copy (present on most rooted ROMs) is better than
+     * capturing nothing at all, so each candidate is executed before use.</p>
+     *
+     * <p>The result is a {@code $( ... )} substitution, so it must be used as
+     * an argument rather than concatenated without quoting.</p>
+     *
+     * @return a shell word usable in place of the tool name; the bundled path
+     *         is returned as last resort so the driver error stays visible.
+     */
+    public String executable(String name) {
+        String bundled = quote(new File(bin, name).getAbsolutePath());
+        if (!name.matches("[A-Za-z0-9._-]{1,32}")) return bundled;
+        String system = quote("/system/bin/" + name);
+        return "$( if " + bundled + " --version >/dev/null 2>&1; then printf '%s' " + bundled
+                + "; elif " + system + " --version >/dev/null 2>&1; then printf '%s' " + system
+                + "; elif command -v " + name + " >/dev/null 2>&1; then command -v " + name
+                + "; else printf '%s' " + bundled + "; fi )";
     }
 
     public static String quote(String value) {

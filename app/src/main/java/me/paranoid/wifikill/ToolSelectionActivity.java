@@ -47,8 +47,14 @@ public class ToolSelectionActivity extends AppCompatActivity {
         initPackageSelection();
         continueButton.setEnabled(false);
         
+        final TextView agreementHint = findViewById(R.id.agreement_hint);
         agreementCheckbox.setOnCheckedChangeListener((buttonView, isChecked) -> {
             continueButton.setEnabled(isChecked);
+            // A greyed out button with no explanation is a dead end; hide the
+            // hint as soon as the declaration is acknowledged.
+            if (agreementHint != null) {
+                agreementHint.setVisibility(isChecked ? View.GONE : View.VISIBLE);
+            }
         });
         
         continueButton.setOnClickListener(v -> completeSetup());
@@ -73,7 +79,7 @@ public class ToolSelectionActivity extends AppCompatActivity {
             sizeText.setText(updateSizeLabel(pkg));
             
             // 为可选工具包添加工具列表说明
-            if (!pkg.preInstalled) {
+            if (!toolManager.isPreInstalled(pkg)) {
                 checkBox.setText(pkg.name + " (" + String.join(", ", pkg.tools) + ")");
             }
             

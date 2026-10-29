@@ -59,6 +59,76 @@ final class WifiRecovery {
         }
     }
 
+    /**
+     * Re-enables Wi-Fi after monitor mode stopped.
+     *
+     * <p>The start switches Wi-Fi off so the framework releases the station
+     * vdev: while it holds one, peach_v2 refuses both a monitor vdev and the
+     * channel tune. Removing the monitor interface does not switch the radio
+     * back on, and {@code reconnect()} alone leaves the device offline. The
+     * radio is therefore re-enabled from a root shell and the result is only
+     * reported once a connection exists again.</p>
+     */
+    static boolean reenableAfterConMode(Context context) {
+        if (isConnected(context)) return true;
+        Process process = null;
+        try {
+            // "svc wifi enable" is used instead of "cmd wifi set-wifi-enabled
+            // enabled": the latter honours the framework's user preference and
+            // silently does nothing when the radio was switched off by the
+            // system, which is exactly the state after a con_mode switch.
+            process = new ProcessBuilder("su", "-c",
+                    "svc wifi enable >/dev/null 2>&1 || cmd wifi set-wifi-enabled enabled")
+                    .redirectErrorStream(true).start();
+            process.getOutputStream().close();
+            long deadline = System.currentTimeMillis() + REENABLE_TIMEOUT_MS;
+            int code;
+            while (true) {
+                try {
+                    code = process.exitValue();
+                    break;
+                } catch (IllegalThreadStateException stillRunning) {
+                    if (System.currentTimeMillis() >= deadline) {
+                        process.destroy();
+                        return false;
+                    }
+                    RootShell.sleep(50L);
+                }
+            }
+            // svc reports success as soon as the request is queued (and may
+            // not exist on very old ROMs), so only the re-association matters.
+            if (code != 0 && !isWifiEnabled(context)) return false;
+            // The framework re-associates within a few seconds; report success
+            // only once a connection really exists again.
+            long connectedBy = System.currentTimeMillis() + RECONNECT_WAIT_MS;
+            while (System.currentTimeMillis() < connectedBy) {
+                if (isConnected(context)) return true;
+                RootShell.sleep(500L);
+            }
+        } catch (Exception ignored) {
+            // No root shell available; the caller opens the settings screen.
+        } finally {
+            if (process != null) {
+                try {
+                    process.exitValue();
+                } catch (IllegalThreadStateException stillRunning) {
+                    process.destroy();
+                }
+            }
+        }
+        return false;
+    }
+
+    private static boolean isWifiEnabled(Context context) {
+        @SuppressWarnings("deprecation")
+        WifiManager wifi = (WifiManager) context.getApplicationContext()
+                .getSystemService(Context.WIFI_SERVICE);
+        return wifi != null && wifi.isWifiEnabled();
+    }
+
+    private static final long REENABLE_TIMEOUT_MS = 8000L;
+    private static final long RECONNECT_WAIT_MS = 15000L;
+
     /** Opens the system Wi-Fi panel so the user can reconnect manually. */
     static void openSettings(Context context) {
         Intent intent = new Intent(Settings.ACTION_WIFI_SETTINGS);

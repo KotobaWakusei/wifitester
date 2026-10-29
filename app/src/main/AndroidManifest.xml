@@ -11,7 +11,9 @@
     <!-- Tool package downloads run as a foreground service with progress. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application
         android:name=".WiFiTesterApp"
@@ -52,12 +54,15 @@
             android:theme="@style/MonitorTheme"
             android:parentActivityName="me.paranoid.wifikill.MainActivity" />
 
-        <!-- Active test workbench. -->
+        <!-- Active test workbench. Rotation is handled in place: recreating the
+             activity would destroy the running RootProcess (and the log shown
+             on screen) in the middle of a test. -->
         <activity
             android:name="me.paranoid.wifikill.AttackActivity"
             android:exported="false"
             android:label="@string/attack_title"
             android:theme="@style/MonitorTheme"
+            android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|uiMode"
             android:parentActivityName="me.paranoid.wifikill.MainActivity" />
 
         <activity
@@ -113,5 +118,20 @@
             android:name="me.paranoid.wifikill.ToolInstallerService"
             android:exported="false"
             android:foregroundServiceType="dataSync" />
+
+        <!--
+            Keeps a passive capture running after the monitor screen is left.
+            It is a background operation rather than a media task: the Android
+            14+ foreground service types have no better match for a capture,
+            and the notification is the only UI the service owns.
+        -->
+        <service
+            android:name="me.paranoid.wifikill.MonitorCaptureService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Passive Wi-Fi monitor-mode capture requested by the user" />
+        </service>
     </application>
 </manifest>

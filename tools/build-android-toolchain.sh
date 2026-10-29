@@ -68,6 +68,12 @@ check_prerequisites() {
       && ! command -v yacc >/dev/null 2>&1; then
     missing+=("bison (or byacc/yacc)")
   fi
+  # The aircrack-ng source archive ships no generated configure script, so the
+  # autotools are needed as well; without them autogen.sh aborts and the whole
+  # strict build stops with a confusing "no such file: ./configure".
+  command -v libtoolize >/dev/null 2>&1 || missing+=("libtool")
+  command -v autoconf >/dev/null 2>&1 || missing+=("autoconf")
+  command -v automake >/dev/null 2>&1 || missing+=("automake")
   if [[ ${#missing[@]} -gt 0 ]]; then
     echo "missing host tools: ${missing[*]}" >&2
     echo "install them first, e.g.:" >&2
@@ -96,6 +102,41 @@ download() {
 }
 
 # --------------------------------------------------------------------------
+# TLS segment alignment
+#
+# Bionic refuses to run an ARM64 executable whose PT_TLS is underaligned, and
+# it also rejects a segment whose virtual address is not aligned to p_align
+# ("alignment is 64 (skew 48)"). Rewriting p_align in the ELF header does NOT
+# fix that: it only makes the two values disagree.
+#
+# The tools are therefore linked the way Android links its own binaries: libc
+# stays dynamic (only libpcap is static), so lld emits a correct segment, and
+# this check rejects anything that would not start on the device.
+# --------------------------------------------------------------------------
+tls_ok() {
+  local binary="$1"
+  python3 - "$binary" <<'PYTHON'
+import struct, sys
+path = sys.argv[1]
+with open(path, 'rb') as handle:
+    data = handle.read()
+if data[:4] != b'\x7fELF' or data[4] != 2 or data[5] != 1:
+    sys.exit(0)                          # not a little-endian ELF64 file
+e_phoff, = struct.unpack_from('<Q', data, 0x20)
+e_phentsize, e_phnum = struct.unpack_from('<HH', data, 0x36)
+for index in range(e_phnum):
+    offset = e_phoff + index * e_phentsize
+    if struct.unpack_from('<I', data, offset)[0] != 7:   # PT_TLS
+        continue
+    p_offset, p_vaddr = struct.unpack_from('<QQ', data, offset + 8)
+    p_align, = struct.unpack_from('<Q', data, offset + 0x30)
+    if p_align < 64 or p_vaddr % p_align != 0:
+        sys.exit(1)
+sys.exit(0)
+PYTHON
+}
+
+# --------------------------------------------------------------------------
 # libpcap (static)
 # --------------------------------------------------------------------------
 build_libpcap() {
@@ -111,7 +152,6 @@ build_libpcap() {
   make -j"$(nproc)" || return 1
   make install || return 1
 }
-
 # --------------------------------------------------------------------------
 # tcpdump
 # --------------------------------------------------------------------------
@@ -122,12 +162,19 @@ build_tcpdump() {
     "https://github.com/the-tcpdump-group/tcpdump/releases/download/tcpdump-${TCPDUMP_VERSION}/tcpdump-${TCPDUMP_VERSION}.tar.gz"
   tar -xf "$WORK/tcpdump.tar.xz" -C "$WORK" || tar -xzf "$WORK/tcpdump.tar.xz" -C "$WORK" || return 1
   cd "$WORK/tcpdump-${TCPDUMP_VERSION}" || return 1
+  # libpcap is linked statically; libc must stay dynamic. A fully static link
+  # keeps PT_TLS at 8-byte alignment on ARM64, which Bionic rejects, so the
+  # binary would be packaged but never start on the device.
   CC="$CC" AR="$AR" RANLIB="$RANLIB" CFLAGS="-O2 -fPIC" \
-    LDFLAGS="-static" LIBS="$PREFIX/lib/libpcap.a" ./configure \
+    LIBS="$PREFIX/lib/libpcap.a" ./configure \
     --host=aarch64-linux-android --prefix="$PREFIX" --with-crypto=no
   make -j"$(nproc)" || return 1
-  install -m 0755 tcpdump "$ASSETS/tcpdump" || return 1
-  "$STRIP" "$ASSETS/tcpdump"
+  install -m 0755 tcpdump "$WORK/tcpdump" || return 1
+  "$STRIP" "$WORK/tcpdump"
+  if ! tls_ok "$WORK/tcpdump"; then
+    fatal "tcpdump: PT_TLS is underaligned or skewed; Bionic would refuse to run it"
+  fi
+  install -m 0755 "$WORK/tcpdump" "$ASSETS/tcpdump" || return 1
 }
 
 # --------------------------------------------------------------------------
@@ -170,7 +217,7 @@ build_aircrack() {
   # The release tarball ships a generated configure script; the GitHub
   # snapshot does not and has to be bootstrapped with autogen.sh.
   if [[ ! -x ./configure ]]; then
-    ./autogen.sh
+    ./autogen.sh || fatal "aircrack-ng: autogen.sh failed (install libtool, autoconf and automake)"
   fi
   # Android uses UTF-8 for app process text. Aircrack-ng 1.7 calls
   # nl_langinfo(CODESET) in its terminal helper, but that declaration is not
@@ -187,7 +234,7 @@ build_aircrack() {
     CPPFLAGS="-I$PREFIX/openssl/include -I$PREFIX/include" \
     CFLAGS="-O2 -fPIC" \
     CXXFLAGS="-O2 -fPIC" \
-    LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static" \
+    LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static-libstdc++" \
     LIBS="-lssl -lcrypto -ldl -pthread" \
     PKG_CONFIG_PATH="$PREFIX/openssl/lib/pkgconfig" \
     OPENSSL_CFLAGS="-I$PREFIX/openssl/include" \
@@ -220,6 +267,78 @@ build_aircrack() {
       fatal "aircrack-ng: required installed tool $tool missing under $PREFIX"
     fi
   done
+  # Package shared libraries needed by the aircrack-ng suite so the device can
+  # run them even when the system lacks the matching libraries.
+  mkdir -p "$ASSETS/lib"
+  for lib in "$PREFIX/lib/libaircrack-osdep-1.7.0.so" "$PREFIX/lib/libaircrack-ce-wpa.so" \
+             "$PREFIX/lib/libz.so" "$PREFIX/lib/libssl.so" "$PREFIX/lib/libcrypto.so"; do
+    if [[ -f "$lib" ]]; then
+      install -m 0755 "$lib" "$ASSETS/lib/"
+    fi
+  done
+  # Fix RUNPATH in packaged ELF executables: replace build-time temp dir with
+  # $ORIGIN/../lib so the device can find the bundled shared libraries.
+  python3 - "$ASSETS" <<'PYEOF'
+import struct, sys, os
+
+assets = sys.argv[1]
+lib_dir = os.path.join(assets, "lib")
+if not os.path.isdir(lib_dir):
+    sys.exit(0)
+
+for name in os.listdir(assets):
+    path = os.path.join(assets, name)
+    if not os.path.isfile(path):
+        continue
+    with open(path, "rb") as f:
+        data = f.read()
+    if data[:4] != b"\x7fELF":
+        continue
+    # Parse dynamic section to find RUNPATH string offset
+    e_phoff = struct.unpack_from("<Q", data, 0x20)[0]
+    e_phentsize, e_phnum = struct.unpack_from("<HH", data, 0x36)
+    # Find PT_DYNAMIC
+    dyn_offset = None
+    for i in range(e_phnum):
+        off = e_phoff + i * e_phentsize
+        if struct.unpack_from("<I", data, off)[0] == 2:  # PT_DYNAMIC
+            dyn_offset = struct.unpack_from("<Q", data, off + 8)[0]
+            break
+    if dyn_offset is None:
+        continue
+    # Walk dynamic entries to find RUNPATH (DT_RUNPATH = 0x1d)
+    ptr = dyn_offset
+    runpath_str_offset = None
+    while True:
+        tag, val = struct.unpack_from("<qq", data, ptr)
+        if tag == 0:  # DT_NULL
+            break
+        if tag == 0x1d:  # DT_RUNPATH
+            runpath_str_offset = val
+            break
+        ptr += 16
+    if runpath_str_offset is None:
+        continue
+    # Read the RUNPATH string
+    str_end = data.index(b"\x00", runpath_str_offset)
+    old_runpath = data[runpath_str_offset:str_end].decode("utf-8", errors="replace")
+    # Replace any absolute build paths with $ORIGIN/../lib
+    new_runpath = old_runpath
+    for part in old_runpath.split(":"):
+        if part.startswith("/tmp/") or part.startswith("/build/") or "prefix/lib" in part:
+            new_runpath = new_runpath.replace(part, "$ORIGIN/../lib")
+    if new_runpath != old_runpath:
+        new_bytes = new_runpath.encode("utf-8") + b"\x00"
+        # Pad to same length
+        if len(new_bytes) <= len(old_runpath) + 1:
+            new_bytes = new_bytes + b"\x00" * (len(old_runpath) + 1 - len(new_bytes))
+            data = data[:runpath_str_offset] + new_bytes + data[str_end + 1:]
+            with open(path, "wb") as f:
+                f.write(data)
+            print(f"Fixed RUNPATH in {name}: {old_runpath} -> {new_runpath}")
+        else:
+            print(f"Skipped {name}: new RUNPATH too long")
+PYEOF
 }
 
 # --------------------------------------------------------------------------
@@ -248,7 +367,7 @@ build_hostapd() {
   # utils/includes.h failures. hostapd supports EXTRA_CFLAGS/EXTRA_LDFLAGS.
   make -j"$(nproc)" CC="$CC" AR="$AR" RANLIB="$RANLIB" \
     EXTRA_CFLAGS="-I$PREFIX/openssl/include -D__ANDROID_API__=23" \
-    EXTRA_LDFLAGS="-L$PREFIX/openssl/lib -static" \
+    EXTRA_LDFLAGS="-L$PREFIX/openssl/lib" \
     CONFIG_LIBNL=n CONFIG_IEEE8021AX=n CONFIG_DRIVER_NL80211=y || return 1
   install -m 0755 hostapd "$ASSETS/hostapd" || return 1
   "$STRIP" "$ASSETS/hostapd"
@@ -264,8 +383,11 @@ build_arpspoof() {
   [[ -f "$source" ]] || fatal "missing $source"
   "$CC" -O2 -fPIE -pie \
     -o "$WORK/arpspoof" "$source"
+  "$STRIP" "$WORK/arpspoof"
+  if ! tls_ok "$WORK/arpspoof"; then
+    fatal "arpspoof: PT_TLS is underaligned or skewed"
+  fi
   install -m 0755 "$WORK/arpspoof" "$ASSETS/arpspoof" || return 1
-  "$STRIP" "$ASSETS/arpspoof"
 }
 
 # --------------------------------------------------------------------------
@@ -306,6 +428,16 @@ fi
 # arpspoof is built from the sources in this repository and needs no
 # external dependency, so it is built even without the other tools.
 run_step "arpspoof" build_arpspoof || true
+
+log "verifying TLS alignment of bundled executables"
+for binary in "$ASSETS"/*; do
+  [[ -f "$binary" ]] || continue
+  if "$READELF" -h "$binary" >/dev/null 2>&1; then
+    if ! tls_ok "$binary"; then
+      fatal "$(basename "$binary"): TLS segment alignment below 64 bytes"
+    fi
+  fi
+done
 
 log "packaged tools"
 packaged=0

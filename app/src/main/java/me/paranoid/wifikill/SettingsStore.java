@@ -29,6 +29,14 @@ final class SettingsStore {
     static final String KEY_WEAK_NETWORK_THRESHOLD = "weak_network_threshold";
     static final String KEY_THEME_MODE = "theme_mode";
     static final String KEY_LANGUAGE = "app_language";
+    /** Fill the attack workbench target fields from the device instead of guessing. */
+    static final String KEY_ATTACK_AUTOFILL = "attack_autofill_target";
+    static final String KEY_CAPTURE_SESSION_ACTIVE = "capture_session_active";
+    static final String KEY_CAPTURE_SESSION_INTERFACE = "capture_session_interface";
+    static final String KEY_CAPTURE_SESSION_MONITOR = "capture_session_monitor";
+    static final String KEY_CAPTURE_SESSION_STATE = "capture_session_state";
+    static final String KEY_CAPTURE_SESSION_CREATED = "capture_session_created";
+    static final String KEY_CAPTURE_SESSION_PATH = "capture_session_path";
 
     /** Accepted packet-count limits. Anything else falls back to the default. */
     static final int[] PACKET_LIMIT_CHOICES = {5000, 20000, 50000};
@@ -94,6 +102,20 @@ final class SettingsStore {
         prefs(context).edit().putBoolean(KEY_ATTACK_ACK, authorized).apply();
     }
 
+    /**
+     * Whether the attack workbench may fill its target fields (gateway, local
+     * interface and address, neighbour list, scanned access point) from the
+     * device. Only empty fields are filled, so a value the user typed is
+     * never replaced.
+     */
+    static boolean attackAutofill(Context context) {
+        return prefs(context).getBoolean(KEY_ATTACK_AUTOFILL, true);
+    }
+
+    static void setAttackAutofill(Context context, boolean enabled) {
+        prefs(context).edit().putBoolean(KEY_ATTACK_AUTOFILL, enabled).apply();
+    }
+
     static String wordlistPath(Context context) {
         String stored = prefs(context).getString(KEY_WORDLIST_PATH, "");
         return stored == null ? "" : stored.trim();
@@ -110,6 +132,63 @@ final class SettingsStore {
 
     static void setDefaultInterface(Context context, String name) {
         prefs(context).edit().putString(KEY_DEFAULT_INTERFACE, name == null ? "" : name.trim()).apply();
+    }
+
+    /**
+     * Records a running monitor session so a later launch can finish the
+     * restore when the capture was stopped from the notification (or the
+     * process died) while the workbench was not in front.
+     */
+    static void setCaptureSession(Context context, String iface, String monitor,
+                                  String originalState, boolean created, String path) {
+        prefs(context).edit()
+                .putBoolean(KEY_CAPTURE_SESSION_ACTIVE, true)
+                .putString(KEY_CAPTURE_SESSION_INTERFACE, iface == null ? "" : iface.trim())
+                .putString(KEY_CAPTURE_SESSION_MONITOR, monitor == null ? "" : monitor.trim())
+                .putString(KEY_CAPTURE_SESSION_STATE, originalState == null ? "" : originalState.trim())
+                .putBoolean(KEY_CAPTURE_SESSION_CREATED, created)
+                .putString(KEY_CAPTURE_SESSION_PATH, path == null ? "" : path)
+                .apply();
+    }
+
+    /** Whether a session is still registered (capture running or awaiting restore). */
+    static boolean captureSessionActive(Context context) {
+        return prefs(context).getBoolean(KEY_CAPTURE_SESSION_ACTIVE, false);
+    }
+
+    static String captureSessionInterface(Context context) {
+        String stored = prefs(context).getString(KEY_CAPTURE_SESSION_INTERFACE, "");
+        return stored == null ? "" : stored.trim();
+    }
+
+    static String captureSessionMonitor(Context context) {
+        String stored = prefs(context).getString(KEY_CAPTURE_SESSION_MONITOR, "");
+        return stored == null ? "" : stored.trim();
+    }
+
+    static String captureSessionOriginalState(Context context) {
+        String stored = prefs(context).getString(KEY_CAPTURE_SESSION_STATE, "");
+        return stored == null ? "" : stored.trim();
+    }
+
+    static boolean captureSessionCreated(Context context) {
+        return prefs(context).getBoolean(KEY_CAPTURE_SESSION_CREATED, false);
+    }
+
+    static String captureSessionPath(Context context) {
+        String stored = prefs(context).getString(KEY_CAPTURE_SESSION_PATH, "");
+        return stored == null ? "" : stored.trim();
+    }
+
+    static void clearCaptureSession(Context context) {
+        prefs(context).edit()
+                .remove(KEY_CAPTURE_SESSION_ACTIVE)
+                .remove(KEY_CAPTURE_SESSION_INTERFACE)
+                .remove(KEY_CAPTURE_SESSION_MONITOR)
+                .remove(KEY_CAPTURE_SESSION_STATE)
+                .remove(KEY_CAPTURE_SESSION_CREATED)
+                .remove(KEY_CAPTURE_SESSION_PATH)
+                .apply();
     }
 
     static boolean keepScreenOn(Context context) {

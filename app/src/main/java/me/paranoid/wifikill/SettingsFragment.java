@@ -268,6 +268,13 @@ public final class SettingsFragment extends Fragment {
         card.addView(switchRow(getString(R.string.settings_attack_ack),
                 getString(R.string.settings_attack_ack_detail), ack));
 
+        MaterialSwitch autofill = UiKit.switchView(host(),
+                SettingsStore.attackAutofill(host()), null);
+        autofill.setOnCheckedChangeListener((button, checked) ->
+                SettingsStore.setAttackAutofill(host(), checked));
+        card.addView(switchRow(getString(R.string.settings_attack_autofill),
+                getString(R.string.settings_attack_autofill_detail), autofill));
+
         card.addView(LightKit.text(getActivity(), getString(R.string.settings_wordlist), 13, LightKit.MUTED, false),
                 LightKit.top(getActivity(), 14));
         TextInputLayout wordlistLayout = UiKit.inputLayout(host(), getString(R.string.settings_wordlist));
@@ -310,8 +317,13 @@ public final class SettingsFragment extends Fragment {
         keepAwake.setOnCheckedChangeListener((button, checked) -> {
             SettingsStore.setKeepScreenOn(host(), checked);
             if (getActivity() != null) {
-                getActivity().getWindow().addFlags(
-                        checked ? android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON : 0);
+                if (checked) {
+                    getActivity().getWindow().addFlags(
+                            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                } else {
+                    getActivity().getWindow().clearFlags(
+                            android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+                }
             }
         });
         card.addView(switchRow(getString(R.string.settings_keep_awake),
@@ -348,7 +360,7 @@ public final class SettingsFragment extends Fragment {
         
         // 添加设备信息
         TextView deviceInfo = LightKit.text(getActivity(), 
-                "设备信息: " + toolManager.getDeviceMonitorDescription(), 12, LightKit.MUTED, false);
+                getString(R.string.settings_device_info, describeCapability(toolManager)), 12, LightKit.MUTED, false);
         card.addView(deviceInfo, LightKit.top(getActivity(), 8));
         
         long totalSize = 0;
@@ -379,7 +391,7 @@ public final class SettingsFragment extends Fragment {
             
             // 添加工具列表
             TextView tools = LightKit.text(getActivity(), 
-                    "工具: " + String.join(", ", pkg.tools), 11, LightKit.MUTED, false);
+                    getString(R.string.tools_package_tools, String.join(", ", pkg.tools)), 11, LightKit.MUTED, false);
             info.addView(tools);
 
             // 上次失败的原因保留在列表里，便于用户判断是没网还是包没发布
@@ -392,18 +404,40 @@ public final class SettingsFragment extends Fragment {
             
             item.addView(info, new LinearLayout.LayoutParams(0, -2, 1));
             
-            if (pkg.preInstalled) {
-                TextView status = LightKit.text(getActivity(), 
-                        installed ? getString(R.string.tools_status_installed) : getString(R.string.tools_status_missing),
-                        12, installed ? LightKit.SUCCESS : LightKit.MUTED, false);
-                item.addView(status);
+            final boolean preInstalled = toolManager.isPreInstalled(pkg);
+            final boolean downloadable = toolManager.canDownload(pkg);
+            if (preInstalled && !downloadable) {
+                // Built into the APK: there is nothing to download. When the
+                // extraction did not happen (files removed, disk full, ...)
+                // offer a repair action instead of a dead-end "未安装".
+                if (installed) {
+                    TextView status = LightKit.text(getActivity(),
+                            getString(R.string.tools_status_installed),
+                            12, LightKit.SUCCESS, false);
+                    item.addView(status);
+                } else {
+                    MaterialButton repair = new MaterialButton(getActivity());
+                    repair.setText(getString(R.string.tools_repair));
+                    repair.setTextSize(12);
+                    repair.setMinimumWidth(dp(80));
+                    repair.setOnClickListener(v -> repairBundledTools(repair, pkg));
+                    item.addView(repair);
+                }
             } else {
                 MaterialButton action = new MaterialButton(getActivity());
-                action.setText(installed ? "卸载"
+                // "下载" only when a manifest URL exists; otherwise the button
+                // explains why the package cannot be fetched instead of
+                // starting a download that is guaranteed to fail.
+                action.setText(installed ? getString(R.string.tools_uninstall)
+                        : !downloadable ? getString(R.string.tools_status_unavailable)
                         : lastError.containsKey(pkg.id) ? getString(R.string.tool_download_retry)
-                        : "下载");
+                        : getString(R.string.tools_download));
                 action.setTextSize(12);
                 action.setMinimumWidth(dp(80));
+                action.setEnabled(!installed || !preInstalled);
+                if (!installed && !downloadable) {
+                    action.setEnabled(false);
+                }
                 action.setOnClickListener(v -> {
                     if (toolManager.isPackageInstalled(pkg)) {
                         showUninstallDialog(pkg);
@@ -428,7 +462,7 @@ public final class SettingsFragment extends Fragment {
         card.addView(container, LightKit.top(getActivity(), 10));
         
         TextView totalInfo = LightKit.text(getActivity(), 
-                "总占用空间: " + ToolPackageManager.formatSize(totalSize), 12, LightKit.MUTED, false);
+                getString(R.string.tools_total_size, ToolPackageManager.formatSize(totalSize)), 12, LightKit.MUTED, false);
         card.addView(totalInfo, LightKit.top(getActivity(), 8));
         card.addView(LightKit.text(getActivity(),
                 getString(R.string.tools_not_installed_hint), 11, LightKit.MUTED, false),
@@ -437,6 +471,32 @@ public final class SettingsFragment extends Fragment {
         return card;
     }
     
+    /**
+     * Re-extracts the APK's bundled tools and reports what happened.
+     *
+     * <p>Extraction touches the disk, so it runs off the UI thread; the button
+     * is disabled meanwhile to make the wait visible.</p>
+     */
+    private void repairBundledTools(MaterialButton button, ToolPackageManager.ToolPackage pkg) {
+        button.setEnabled(false);
+        button.setText(getString(R.string.tools_repairing));
+        final android.app.Activity activity = getActivity();
+        if (activity == null) return;
+        final android.content.Context context = activity.getApplicationContext();
+        new Thread(() -> {
+            BundledToolchain.InstallResult result = new BundledToolchain(context).reinstall();
+            final ToolPackageManager toolManager = new ToolPackageManager(context);
+            final boolean installed = toolManager.isPackageInstalled(pkg);
+            activity.runOnUiThread(() -> {
+                if (activity.isFinishing()) return;
+                MainActivity.notify(activity, installed
+                        ? getString(R.string.tools_repair_done, pkg.name)
+                        : getString(R.string.tools_repair_failed, result.message));
+                refreshSettings();
+            });
+        }, "wifitester-tool-repair").start();
+    }
+
     private void showUninstallDialog(ToolPackageManager.ToolPackage pkg) {
         new MaterialAlertDialogBuilder(host())
                 .setTitle(getString(R.string.tools_uninstall_title))
@@ -456,6 +516,23 @@ public final class SettingsFragment extends Fragment {
         lastError.remove(pkg.id);
         ToolInstallerService.start(getActivity(), pkg);
         MainActivity.notify(getActivity(), getString(R.string.tool_download_started, pkg.name));
+    }
+
+    /** Localized device capability sentence for the tools card. */
+    private String describeCapability(ToolPackageManager toolManager) {
+        switch (toolManager.getDeviceMonitorCapability()) {
+            case FULL_MONITOR_INJECTION:
+                return getString(R.string.attack_capability_full);
+            case MONITOR_ONLY:
+                return getString(R.string.attack_capability_monitor_only);
+            case NO_MONITOR:
+                return getString(R.string.attack_capability_no_monitor);
+            case REQUIRES_OTG:
+                return getString(R.string.attack_capability_requires_otg);
+            case UNKNOWN:
+            default:
+                return getString(R.string.attack_capability_unknown);
+        }
     }
 
     /** Keeps the failure reason of each package so the card can show it. */

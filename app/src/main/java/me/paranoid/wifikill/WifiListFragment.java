@@ -55,6 +55,7 @@ public final class WifiListFragment extends Fragment {
     private TextView connectedDetails;
     private TextView rootWarning;
     private TextView scanSummary;
+    private MaterialButton scanButton;
 
     private final List<NetworkEntry> entries = new ArrayList<>();
     private int sortMode = SORT_BY_SIGNAL;
@@ -178,6 +179,7 @@ public final class WifiListFragment extends Fragment {
         heading.addView(LightKit.text(getActivity(), getString(R.string.wifi_nearby), 16, LightKit.INK, true),
                 new LinearLayout.LayoutParams(0, -2, 1));
         MaterialButton scan = LightKit.secondary(getActivity(), getString(R.string.wifi_scan));
+        scanButton = scan;
         scan.setOnClickListener(v -> startScan());
         heading.addView(scan);
         card.addView(heading);
@@ -299,6 +301,10 @@ public final class WifiListFragment extends Fragment {
             return;
         }
         scanSummary.setText(getString(R.string.wifi_scan_requesting));
+        // Android throttles foreground scans to roughly one every few seconds.
+        // Disabling the button for that window is the honest feedback: a tap
+        // would otherwise appear to be ignored.
+        lockScanButton();
         try {
             wifi.startScan();
             loadScanResults();
@@ -307,6 +313,16 @@ public final class WifiListFragment extends Fragment {
         } catch (Exception failure) {
             scanSummary.setText(getString(R.string.wifi_scan_failed, failure.getClass().getSimpleName()));
         }
+    }
+
+    /** Greys the scan button for the system throttling window. */
+    private void lockScanButton() {
+        final MaterialButton button = scanButton;
+        if (button == null) return;
+        button.setEnabled(false);
+        button.postDelayed(() -> {
+            if (isAdded()) button.setEnabled(true);
+        }, 2500L);
     }
 
     private void loadScanResults() {

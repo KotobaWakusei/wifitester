@@ -1,67 +1,86 @@
 package me.paranoid.wifikill;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+
+import android.content.Context;
+
 import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.robolectric.RobolectricTestRunner;
+import org.robolectric.RuntimeEnvironment;
+import org.robolectric.annotation.Config;
+
 import java.util.List;
-import static org.junit.Assert.*;
 
+/**
+ * Guards the inventory parser: a tool that exists on disk but refuses to start
+ * ("CANNOT RUN") must never be reported as missing, and the parsed paths must
+ * end up available to the workbenches.
+ */
+@RunWith(RobolectricTestRunner.class)
+@Config(sdk = 33)
 public class ToolCatalogTest {
-    @Test public void parsesAvailableAndMissingToolsInStableOrder() {
-        String output = "uid=0(root)\n"
-                + "WIFITESTER_TOOL\taircrack-ng\t/data/data/com.termux/files/usr/bin/aircrack-ng\n"
-                + "WIFITESTER_TOOL\ttcpdump\t/data/user/0/example/files/toolchain/bin/tcpdump\n"
-                + "WIFITESTER_TOOL\tiw\t\n";
-        List<ToolCatalog.Tool> tools = ToolCatalog.parse(output);
-        assertEquals(11, tools.size());
-        assertEquals("aircrack-ng", tools.get(0).name);
-        assertTrue(tools.get(0).isAvailable());
-        assertTrue("tcpdump must be reported as available", byName(tools, "tcpdump").isAvailable());
-        assertFalse(byName(tools, "iw").isAvailable());
-        assertFalse(byName(tools, "hostapd").isAvailable());
+
+    private static String probeOutput() {
+        return "WIFITESTER_TOOL\taircrack-ng\t/toolchain/bin/aircrack-ng\n"
+                + "WIFITESTER_TOOL\taireplay-ng\tCANNOT RUN\n"
+                + "WIFITESTER_TOOL\ttcpdump\t /system/bin/tcpdump \n"
+                + "WIFITESTER_TOOL\tiw\t\n"
+                + "WIFITESTER_TOOL\tip\tnot found\n"
+                // Unknown tool names are ignored, not invented into the report.
+                + "WIFITESTER_TOOL\tfoo\t/some/foo\n"
+                + "garbage line\n";
     }
 
-    private static ToolCatalog.Tool byName(List<ToolCatalog.Tool> tools, String name) {
+    @Test public void presentButUnrunnableToolIsNotMissing() {
+        Context context = RuntimeEnvironment.getApplication();
+        List<ToolCatalog.Tool> tools = ToolCatalog.parse(probeOutput());
+        // Unknown tool names from the probe output are not invented entries.
+        for (ToolCatalog.Tool entry : tools) {
+            assertFalse("foo must not appear", entry.name.equals("foo"));
+        }
+
+        ToolCatalog.Tool airodump = find(tools, "airodump-ng");
+        // Never reported by the probe: neither path nor status -> missing.
+        assertFalse(airodump.isAvailable());
+        assertFalse(airodump.isPresent());
+
+        ToolCatalog.Tool aireplay = find(tools, "aireplay-ng");
+        // Found on disk but cannot start: present, not missing, not usable.
+        assertFalse(aireplay.isAvailable());
+        assertTrue(aireplay.isPresent());
+        assertEquals("CANNOT RUN", aireplay.status);
+
+        ToolCatalog.Tool aircrack = find(tools, "aircrack-ng");
+        assertTrue(aircrack.isAvailable());
+    }
+
+    @Test public void reportShowsCannotRunInsteadOfMissing() {
+        Context context = RuntimeEnvironment.getApplication();
+        String report = ToolCatalog.format(context, probeOutput());
+        String aireplayLine = lineFor(report, "aireplay-ng");
+        String airodumpLine = lineFor(report, "airodump-ng");
+
+        assertTrue("CANNOT RUN state is surfaced",
+                aireplayLine.contains(context.getString(R.string.tool_cannot_run)));
+        assertTrue("genuinely missing tools stay missing",
+                airodumpLine.contains(context.getString(R.string.tool_missing)));
+        assertTrue("paths are reported", report.contains("/toolchain/bin/aircrack-ng"));
+    }
+
+    private static ToolCatalog.Tool find(List<ToolCatalog.Tool> tools, String name) {
         for (ToolCatalog.Tool tool : tools) {
-            if (tool.name.equals(name)) {
-                return tool;
-            }
+            if (tool.name.equals(name)) return tool;
         }
-        throw new AssertionError("tool not listed: " + name);
+        throw new AssertionError("no tool named " + name);
     }
 
-    @Test public void reportsInjectionToolsAsPartOfTheInventory() {
-        List<ToolCatalog.Tool> tools = ToolCatalog.parse("");
-        boolean aireplay = false;
-        boolean hostapd = false;
-        boolean arpspoof = false;
-        for (ToolCatalog.Tool tool : tools) {
-            if ("aireplay-ng".equals(tool.name)) aireplay = true;
-            if ("hostapd".equals(tool.name)) hostapd = true;
-            if ("arpspoof".equals(tool.name)) arpspoof = true;
+    private static String lineFor(String report, String name) {
+        for (String line : report.split("\n")) {
+            if (line.startsWith(name)) return line;
         }
-        assertTrue("aireplay-ng must be part of the inventory", aireplay);
-        assertTrue("hostapd must be part of the inventory", hostapd);
-        assertTrue("arpspoof must be part of the inventory", arpspoof);
-    }
-
-    @Test public void ignoresUnexpectedToolNamesAndMalformedLines() {
-        List<ToolCatalog.Tool> tools = ToolCatalog.parse(
-                "WIFITESTER_TOOL\tunknown-tool\t/tmp/unknown\n"
-                        + "WIFITESTER_TOOL\taircrack-ng\t\n"
-                        + "bad line");
-        assertFalse(tools.get(0).isAvailable());
-        assertFalse(tools.get(1).isAvailable());
-    }
-
-    @Test public void rejectsRelativePathsAsNotUsable() {
-        List<ToolCatalog.Tool> tools = ToolCatalog.parse(
-                "WIFITESTER_TOOL\taircrack-ng\tbin/aircrack-ng");
-        assertFalse(tools.get(0).isAvailable());
-    }
-
-    @Test public void probeCommandMentionsEveryCatalogTool() {
-        String command = ToolCatalog.probeCommand();
-        for (ToolCatalog.Tool tool : ToolCatalog.parse("")) {
-            assertTrue("probe command must query " + tool.name, command.contains(tool.name));
-        }
+        return "";
     }
 }

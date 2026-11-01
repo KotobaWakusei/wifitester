@@ -222,12 +222,45 @@ build_aircrack() {
     ./configure --host="$TARGET" --prefix="$PREFIX" \
       --without-libnl --without-udev --disable-etc --disable-gcrypt --disable-tui \
       --enable-static --disable-shared >/dev/null || return 1
+  # configure embeds CFLAGS verbatim into the Makefile, and the recipe shell
+  # then dies on the bare parentheses of -Dnl_langinfo(x)="UTF-8"
+  # ("/bin/bash: -c: line 1: syntax error near unexpected token `('").
+  # Escape the parentheses and quotes in the generated Makefiles only: make
+  # hands the recipe to bash, which strips the backslashes and passes the
+  # intended macro to clang; the configure-time probes above are untouched.
+  find . -name Makefile -exec sed -i \
+    's/-Dnl_langinfo(x)="UTF-8"/-Dnl_langinfo\\(x\\)=\\"UTF-8\\"/g' {} + || return 1
   make -j"$(nproc)" >/dev/null 2>&1 || make -j"$(nproc)" || return 1
   make install >/dev/null 2>&1 || return 1
 }
 
+# libnl-3 is the only nl80211 access library upstream hostapd accepts, and
+# the NDK ships nothing like it. Build a static copy into $PREFIX before
+# hostapd, mirroring how libpcap and OpenSSL are produced on demand.
+build_libnl() {
+  log "libnl"
+  download "$WORK/libnl.tar.gz" \
+    "https://github.com/thom311/libnl/releases/download/libnl3_11_0/libnl-3.11.0.tar.gz" \
+    "https://github.com/thom311/libnl/archive/refs/tags/libnl3_11_0.tar.gz" || return 1
+  mkdir -p "$WORK/libnl"
+  tar -xf "$WORK/libnl.tar.gz" -C "$WORK/libnl" --strip-components=1 || return 1
+  cd "$WORK/libnl" || return 1
+  # The tag snapshot has no generated configure script.
+  [[ -f ./configure ]] || autoreconf -fi >/dev/null 2>&1 || return 1
+  CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+    CFLAGS="-O2 -fPIC -D_GNU_SOURCE" \
+    LDFLAGS="-static" \
+    ./configure --host="$TARGET" --prefix="$PREFIX" \
+      --disable-shared --enable-static --disable-cli --disable-debug \
+      >/dev/null || return 1
+  make -j"$(nproc)" >/dev/null || return 1
+  make install >/dev/null || return 1
+}
+
 build_hostapd() {
   log "hostapd ${HOSTAPD_VERSION}"
+  # The nl80211 driver needs libnl headers and libraries.
+  [[ -f "$PREFIX/lib/libnl-3.a" ]] || build_libnl || return 1
   download "$WORK/hostapd.tar.gz" \
     "https://w1.fi/releases/hostapd-${HOSTAPD_VERSION}.tar.gz" || return 1
   tar -xzf "$WORK/hostapd.tar.gz" -C "$WORK" || return 1
@@ -253,24 +286,31 @@ build_hostapd() {
   # Do not pass CFLAGS on the command line: it replaces the include paths that
   # the hostapd Makefile adds (src/, src/utils ...) and every file fails with
   # "utils/includes.h file not found". EXTRA_CFLAGS/LDFLAGS are meant to append.
-  # Use static libnl built earlier, not system library
-  make -j"$(nproc)" CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-    EXTRA_CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include -I../src/utils -I$PREFIX/include/libnl3" \
-    LIBS="-L$PREFIX/lib -lnl-genl-3 -lnl-3 -lc -ldl" \
-    LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static" >/dev/null 2>&1 || return 1
+  # Link against the static libnl built above.
+  local -a MAKE_ARGS=(CC="$CC" AR="$AR" RANLIB="$RANLIB"
+    EXTRA_CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include -I../src/utils -I$PREFIX/include/libnl3"
+    LIBS="-L$PREFIX/lib -lnl-genl-3 -lnl-3 -lc -ldl"
+    LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static")
+  # The first attempt is silenced to keep the log short; a failure reruns
+  # loudly so the CI log shows the real compiler error instead of a bare
+  # "hostapd failed" with no cause.
+  make -j"$(nproc)" "${MAKE_ARGS[@]}" >/dev/null 2>&1 \
+    || make -j1 "${MAKE_ARGS[@]}" || return 1
   install -m 0755 hostapd "$PREFIX/bin/hostapd"
 }
 
 build_reaver() {
   log "reaver ${REAVER_VERSION}"
   # The GitHub tag snapshots ship no generated configure script, so the
-  # pregenerated tarballs from the project site are preferred.
-  download "$WORK/reaver.tar.gz" \
-    "https://github.com/t6x/reaver-wps-fork-t6x/releases/download/v${REAVER_VERSION}/reaver-${REAVER_VERSION}.tar.gz" \
+  # pregenerated tarballs from the project site are preferred. Upstream
+  # publishes the release asset as .tar.xz (the old .tar.gz URL 404s).
+  download "$WORK/reaver.tar.xz" \
+    "https://github.com/t6x/reaver-wps-fork-t6x/releases/download/v${REAVER_VERSION}/reaver-${REAVER_VERSION}.tar.xz" \
     "https://github.com/t6x/reaver-wps-fork-t6x/archive/refs/tags/v${REAVER_VERSION}.tar.gz" || return 1
   rm -rf "$WORK/reav"
   mkdir -p "$WORK/reav"
-  tar -xzf "$WORK/reaver.tar.gz" -C "$WORK/reav" --strip-components=1 || return 1
+  # GNU tar auto-detects gzip and xz, so one call handles both fallbacks.
+  tar -xf "$WORK/reaver.tar.xz" -C "$WORK/reav" --strip-components=1 || return 1
   cd "$WORK/reav" || return 1
   if [[ ! -x ./configure ]]; then
     if ! command -v autoreconf >/dev/null 2>&1; then

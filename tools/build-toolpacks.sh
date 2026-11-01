@@ -288,7 +288,7 @@ build_hostapd() {
   # The Makefile uses "ifdef CONFIG_*", so a duplicate "=y" line still counts.
   # Remove every existing definition first, then write the final choices.
   grep -vE '^CONFIG_(LIBNL32|LIBNL|LIBNL3|LIBNL_ROUTE3|LIBNL3_ROUTE|DRIVER_NL80211|DRIVER_HOSTAP|IEEE8021X_EAPOL)=' \
-    defconfig > .config
+    defconfig > .config || true
   {
     echo 'CONFIG_DRIVER_NL80211=y'
     echo 'CONFIG_IEEE8021X_EAPOL=y'
@@ -313,7 +313,12 @@ build_hostapd() {
   # "hostapd failed" with no cause.
   make -j"$(nproc)" "${MAKE_ARGS[@]}" >/dev/null 2>&1 \
     || make -j1 "${MAKE_ARGS[@]}" || return 1
-  install -m 0755 hostapd "$PREFIX/bin/hostapd"
+  # hostapd 2.11 builds out-of-tree into ../build/<proj>/; accept either
+  # location before packing.
+  BUILT="$PWD/hostapd"
+  [[ -f "$BUILT" ]] || BUILT="$PWD/../build/hostapd/hostapd"
+  [[ -f "$BUILT" ]] || { warn "hostapd: no binary after make"; return 1; }
+  install -m 0755 "$BUILT" "$PREFIX/bin/hostapd"
 }
 
 build_reaver() {

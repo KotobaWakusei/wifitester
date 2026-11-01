@@ -381,6 +381,10 @@ build_libnl() {
 # --------------------------------------------------------------------------
 build_hostapd() {
   log "hostapd ${HOSTAPD_VERSION}"
+  # The nl80211 driver needs the statically cross-compiled libnl. Build it
+  # BEFORE changing directory: build_libnl leaves the shell inside its own
+  # source tree, and a make from there would silently do nothing.
+  [[ -f "$PREFIX/lib/libnl-3.a" ]] || build_libnl || return 1
   download "$WORK/hostapd.tar.gz" \
     "https://w1.fi/releases/hostapd-${HOSTAPD_VERSION}.tar.gz" \
     "https://w1.fi/cgit/hostap/snapshot/hostapd-${HOSTAPD_VERSION}.tar.gz"
@@ -395,25 +399,31 @@ build_hostapd() {
     cp defconfig .config || return 1
   fi
   # hostapd's Makefile uses "ifdef CONFIG_*", so a duplicate "=y" line still
-  # counts; strip every existing definition of the ones we append.
+  # counts; strip every existing definition of the ones we append. grep
+  # returns 1 when nothing matches, so mv must not depend on its status.
   grep -vE '^CONFIG_(LIBNL32|LIBNL|LIBNL3|LIBNL_ROUTE3|LIBNL3_ROUTE|DRIVER_NL80211|DRIVER_HOSTAP|IEEE8021X_EAPOL)=' \
-    .config > .config.new && mv .config.new .config
+    .config > .config.new || true
+  mv .config.new .config
   {
     echo 'CONFIG_DRIVER_NL80211=y'
     echo 'CONFIG_IEEE8021X_EAPOL=y'
   } >> .config
-  [[ -f "$PREFIX/lib/libnl-3.a" ]] || build_libnl || return 1
-  # Do not pass CFLAGS/LDFLAGS on make's command line: GNU make then
-  # suppresses hostapd's own include flags (notably -I../src), causing
-  # utils/includes.h failures. hostapd supports EXTRA_CFLAGS/EXTRA_LDFLAGS.
-  # Keep bionic dynamic (like tcpdump): only libnl and OpenSSL come from
-  # static archives, so lld emits a TLS segment the device accepts.
-  make -j"$(nproc)" CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+  # hostapd 2.11 builds out-of-tree: objects and the binary land in
+  # ../build/<proj>/, so "make" can succeed without leaving ./hostapd.
+  # V=1 keeps every command in the CI log for diagnosis.
+  make -j"$(nproc)" V=1 CC="$CC" AR="$AR" RANLIB="$RANLIB" \
     EXTRA_CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include -I../src/utils -I$PREFIX/include/libnl3 -D__ANDROID_API__=23" \
     LIBS="-L$PREFIX/lib -lnl-genl-3 -lnl-3 -L$PREFIX/openssl/lib -lssl -lcrypto -lc -ldl" \
-    EXTRA_LDFLAGS="-L$PREFIX/lib -L$PREFIX/openssl/lib" \
-    CONFIG_DRIVER_NL80211=y || return 1
-  install -m 0755 hostapd "$ASSETS/hostapd" || return 1
+    EXTRA_LDFLAGS="-L$PREFIX/lib -L$PREFIX/openssl/lib" || return 1
+  BUILT="$PWD/hostapd"
+  [[ -f "$BUILT" ]] || BUILT="$PWD/../build/hostapd/hostapd"
+  if [[ ! -f "$BUILT" ]]; then
+    warn "hostapd: no binary after make; directory contents:"
+    ls -la .
+    ls -la ../build 2>/dev/null || true
+    return 1
+  fi
+  install -m 0755 "$BUILT" "$ASSETS/hostapd" || return 1
   "$STRIP" "$ASSETS/hostapd"
 }
 

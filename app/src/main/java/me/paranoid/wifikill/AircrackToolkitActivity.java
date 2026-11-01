@@ -210,7 +210,8 @@ public final class AircrackToolkitActivity extends BaseActivity {
                         "elif [ -x /data/data/com.termux/files/usr/bin/capinfos ]; then /data/data/com.termux/files/usr/bin/capinfos " + quoted + "; " +
                         "elif command -v tshark >/dev/null 2>&1; then tshark -r " + quoted + " -q -z io,phs; " +
                         "elif [ -x /data/data/com.termux/files/usr/bin/tshark ]; then /data/data/com.termux/files/usr/bin/tshark -r " + quoted + " -q -z io,phs; " +
-                        "elif command -v tcpdump >/dev/null 2>&1; then tcpdump -nn -r " + quoted + " -c 20 2>&1; else echo '" + getString(R.string.toolkit_no_tools) + "'; exit 127; fi";
+                        "elif command -v tcpdump >/dev/null 2>&1; then tcpdump -nn -r " + quoted + " -c 20 2>&1; else echo '"
+                                + getString(R.string.toolkit_no_tools).replace("'", "'\\''") + "'; exit 127; fi";
                 Result result = runRoot(cmd, 20000);
                 output = getString(R.string.toolkit_output, uri.getLastPathSegment(), format.displayLabel(this), result.code, result.output);
                 code = result.code;
@@ -233,11 +234,8 @@ public final class AircrackToolkitActivity extends BaseActivity {
 
     private Result runRoot(String command, int timeoutMs) {
         Process p = null;
-        java.util.concurrent.locks.ReentrantLock lock = new java.util.concurrent.locks.ReentrantLock();
-        java.util.concurrent.locks.Condition notEmpty = lock.newCondition();
         StringBuilder out = new StringBuilder();
         int code = -1;
-        boolean writerDone = false;
         try {
             p = new ProcessBuilder("su", "-c", new BundledToolchain(this).shellEnvironment() + command).redirectErrorStream(true).start();
             final Process process = p;
@@ -245,11 +243,8 @@ public final class AircrackToolkitActivity extends BaseActivity {
                 try (BufferedReader r = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                     String line;
                     while ((line = r.readLine()) != null) {
-                        lock.lock();
-                        try {
+                        synchronized (out) {
                             out.append(line).append('\n');
-                        } finally {
-                            lock.unlock();
                         }
                     }
                 } catch (Exception ignored) {}
@@ -269,24 +264,21 @@ public final class AircrackToolkitActivity extends BaseActivity {
             if (!done) {
                 p.destroy();
                 code = 124;
-                lock.lock();
-                try {
+                synchronized (out) {
                     out.append(getString(R.string.command_timeout));
-                } finally {
-                    lock.unlock();
                 }
             }
             reader.join(1000L);
         } catch (Exception e) {
-            lock.lock();
-            try {
+            synchronized (out) {
                 out.append(e.getClass().getSimpleName()).append(": ").append(String.valueOf(e.getMessage()));
-            } finally {
-                lock.unlock();
             }
         } finally {
             if (p != null && isRunning(p)) p.destroy();
         }
+        // The same monitor must guard writes and the final read; the previous
+        // mix of a ReentrantLock (writer) and synchronized(out) (reader) left
+        // the non-thread-safe StringBuilder unprotected between the two.
         synchronized (out) { return new Result(code, out.toString().trim()); }
     }
 

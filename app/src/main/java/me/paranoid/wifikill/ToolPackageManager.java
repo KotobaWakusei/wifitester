@@ -87,27 +87,31 @@ public final class ToolPackageManager {
     }
     
     private void loadConfig() {
-        try {
-            InputStream inputStream = context.getAssets().open(CONFIG_FILE);
-            BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream));
+        // try-with-resources: a failed parse must not leak the asset streams.
+        try (InputStream inputStream = context.getAssets().open(CONFIG_FILE);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
             StringBuilder stringBuilder = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
                 stringBuilder.append(line);
             }
-            reader.close();
-            inputStream.close();
-            
             config = new JSONObject(stringBuilder.toString());
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
-    /** Reads "preinstalled" from the packaged manifest (true only for the core pack). */
+    /**
+     * Reads "preinstalled" from the packaged manifest (true only for the core pack).
+     *
+     * <p>A package that is missing from the manifest is treated as NOT
+     * preinstalled. Returning true here disabled download, uninstall and the
+     * rollback of a failed install with no way for the user to recover;
+     * treating an unknown package as downloadable is the safe direction.</p>
+     */
     boolean isPreInstalled(ToolPackage pkg) {
         JSONObject info = getPackageInfo(pkg.id);
-        return info == null || info.optBoolean("preinstalled", false);
+        return info != null && info.optBoolean("preinstalled", false);
     }
 
     /** Whether the manifest declares a download endpoint for the package. */

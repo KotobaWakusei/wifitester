@@ -533,6 +533,7 @@
     <string name="attack_monitor_only_blocked">The current driver is receive-only and cannot inject frames, so this transmit module was blocked. Use passive capture or an external adapter that supports injection.</string>
     <string name="attack_tools_header">Tools: </string>
     <string name="attack_needs_root">Root access is required</string>
+    <string name="attack_module_running">A module is already running; stop it before starting a new one</string>
     <string name="attack_capture_dir_failed">The capture directory could not be created</string>
     <string name="attack_hostapd_config_failed">The hostapd configuration could not be written: %1$s</string>
     <string name="attack_unknown_module">Unknown module</string>
@@ -665,6 +666,7 @@
     <string name="tool_download_channel_desc">Shows progress while tool packages download</string>
     <string name="tool_downloading">Downloading %s</string>
     <string name="tool_download_starting">Preparing download...</string>
+    <string name="tool_download_busy">A download is already in progress; wait for it to finish and retry</string>
     <string name="tool_download_progress">%1$d%% complete</string>
     <string name="tool_download_complete">Download complete</string>
     <string name="tool_download_failed_title">Download failed</string>

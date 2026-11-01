@@ -27,7 +27,9 @@ final class RootProcess {
 
     private final Process process;
     private volatile long innerPid = -1L;
-    private volatile boolean stopped;
+    /** Atomic so concurrent stop() calls cannot both run the kill sequence. */
+    private final java.util.concurrent.atomic.AtomicBoolean stopped =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
 
     private RootProcess(Process process) {
         this.process = process;
@@ -131,12 +133,21 @@ final class RootProcess {
     /**
      * Stops the tool: the inner process is signalled first so it can flush its
      * output files, and the su wrapper is destroyed afterwards.
+     *
+     * <p>The pid is echoed by the wrapper shortly after the start; when stop()
+     * wins that race the pid is still unknown and killing only the wrapper
+     * would leave the real tool running as root, so stop() waits (bounded) for
+     * the marker line first.</p>
      */
     void stop() {
-        if (stopped) {
+        if (!stopped.compareAndSet(false, true)) {
             return;
         }
-        stopped = true;
+        // Bounded wait for the echoed pid (it is read by the pump thread).
+        long pidDeadline = System.currentTimeMillis() + 1500L;
+        while (innerPid <= 1L && isAlive() && System.currentTimeMillis() < pidDeadline) {
+            RootShell.sleep(20L);
+        }
         long pid = innerPid;
         if (pid > 1L) {
             RootShell.runBare("kill -TERM " + pid + " 2>/dev/null || true", 3000);

@@ -18,8 +18,12 @@ final class AttackCommandBuilder {
     static final Pattern MAC = Pattern.compile("^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$");
     /** Linux network interface name. */
     static final Pattern INTERFACE = Pattern.compile("^[A-Za-z0-9_.-]{1,15}$");
-    /** Absolute path without shell metacharacters. */
-    static final Pattern SAFE_PATH = Pattern.compile("^/[A-Za-z0-9._@+-]+(/[A-Za-z0-9._@+-]+)*$");
+    /**
+     * Absolute path without shell metacharacters. The per-segment lookahead
+     * keeps "." and ".." segments (e.g. "/data/../../x") out of the command.
+     */
+    static final Pattern SAFE_PATH = Pattern.compile(
+            "^/(?!\\.{1,2}(/|$))[A-Za-z0-9._@+-]+(/(?!\\.{1,2}(/|$))[A-Za-z0-9._@+-]+)*$");
 
     /** Upper bound for a single burst of frames, to avoid a runaway command. */
     static final int MAX_FRAME_COUNT = 1_000_000;
@@ -132,12 +136,14 @@ final class AttackCommandBuilder {
         String target = requireMac(bssid, R.string.attack_label_target_bssid);
         requireCount(frameCount, 0, MAX_FRAME_COUNT);
         StringBuilder command = new StringBuilder();
+        // aireplay-ng takes the capture interface as its trailing positional
+        // argument; there is no "-i" option.
         command.append(exe).append(" --deauth ").append(frameCount)
-                .append(" -a ").append(target)
-                .append(" -i ").append(iface);
+                .append(" -a ").append(target);
         if (clientMac != null && !clientMac.trim().isEmpty()) {
             command.append(" -c ").append(requireMac(clientMac, R.string.attack_label_client_mac));
         }
+        command.append(" ").append(iface);
         return command.toString();
     }
 
@@ -150,11 +156,13 @@ final class AttackCommandBuilder {
         String iface = requireInterface(interfaceName);
         requireCount(frameCount, 0, MAX_FRAME_COUNT);
         StringBuilder command = new StringBuilder();
-        command.append(exe).append(" --fakeauth ").append(frameCount)
-                .append(" -i ").append(iface);
+        // The replay interface is aireplay-ng's positional argument, so it is
+        // appended last after every option.
+        command.append(exe).append(" --fakeauth ").append(frameCount);
         if (bssid != null && !bssid.trim().isEmpty()) {
             command.append(" -a ").append(requireMac(bssid, R.string.attack_label_target_bssid));
         }
+        command.append(" ").append(iface);
         return command.toString();
     }
 
@@ -167,8 +175,11 @@ final class AttackCommandBuilder {
         String iface = requireInterface(interfaceName);
         String target = requireMac(bssid, R.string.attack_label_target_bssid);
         requireCount(frameCount, 0, MAX_FRAME_COUNT);
-        return exe + " --fakeauth " + frameCount + " -a " + target + " -i " + iface
-                + " --auth";
+        // aireplay-ng has no "--auth" option (its attacks are --deauth,
+        // --fakeauth, --interactive, --arpreplay, --chopchop, --fragment and
+        // --test); the trailing "--auth" made every run die in getopt. The
+        // closest supported mode is repeated fake authentication.
+        return exe + " --fakeauth " + frameCount + " -a " + target + " " + iface;
     }
 
     /**
@@ -180,12 +191,16 @@ final class AttackCommandBuilder {
         String exe = requireTool(tool);
         String iface = requireInterface(interfaceName);
         String target = requireMac(bssid, R.string.attack_label_target_bssid);
-        if (channel <= 0 || channel > 196) {
+        // 6 GHz channels reach 233 (AttackTargetResolver feeds scanned values
+        // straight in), so the old 196 cap rejected legitimate targets.
+        if (channel <= 0 || channel > 233) {
             throw new ValidationException(R.string.attack_error_channel);
         }
         String prefix = requirePath(outputPrefix, R.string.attack_label_output_prefix);
-        return exe + " --bssid " + target + " -c " + channel + " -i " + iface
-                + " -w " + prefix + " --ignore-negative-one";
+        // airodump-ng's "-i" means "write IVs only", which silently drops
+        // EAPOL frames; the interface is its trailing positional argument.
+        return exe + " --bssid " + target + " -c " + channel
+                + " -w " + prefix + " --ignore-negative-one " + iface;
     }
 
     /**

@@ -156,7 +156,19 @@ public final class FrameAnalysisActivity extends BaseActivity {
                 // The watchdog terminates it after 30 seconds so the worker cannot hang.
                 Thread watchdog = new Thread(() -> {
                     try { Thread.sleep(30000L); } catch (InterruptedException interrupted) { return; }
-                    if (isRunning(p)) p.destroy();
+                    // destroy() only signals the direct child (su). Some su
+                    // implementations fork instead of exec, leaving tcpdump as
+                    // a grandchild that keeps the stdout pipe open, so
+                    // readLine() below would block forever and the analysis
+                    // button stayed disabled until the next app start. Closing
+                    // the streams unblocks the reader regardless.
+                    for (int attempt = 0; attempt < 3 && isRunning(p); attempt++) {
+                        p.destroy();
+                        try { Thread.sleep(200L); } catch (InterruptedException e) { return; }
+                        if (isRunning(p)) p.destroyForcibly();
+                    }
+                    try { p.getInputStream().close(); } catch (Exception ignored) { }
+                    try { p.getOutputStream().close(); } catch (Exception ignored) { }
                 }, "wifitester-frame-watchdog");
                 watchdog.start();
                 StringBuilder lines = new StringBuilder();
@@ -166,8 +178,8 @@ public final class FrameAnalysisActivity extends BaseActivity {
                     while ((line = reader.readLine()) != null) {
                         if (lines.length() < 45000) {
                             lines.append(line).append('\n');
-                            count++;
                         }
+                        count++;
                     }
                 }
                 int code = p.waitFor();

@@ -252,8 +252,15 @@ final class CaptureAnalyzer {
         boolean toDs = (fc1 & 0x01) != 0;
         boolean fromDs = (fc1 & 0x02) != 0;
         boolean fourAddress = (fc1 & 0x03) == 0x03;
-        boolean qos = (fc0 & 0x08) != 0;            // QoS data adds a 2-byte header
-        int headerEnd = off + 24 + (fourAddress ? 6 : 0) + (qos ? 2 : 0);
+        // The QoS indicator is the highest subtype bit (data subtypes 8-15).
+        // The old mask 0x08 is a Type bit that every data frame carries, which
+        // made the parser add the 2-byte QoS header to plain data frames too
+        // and miss every EAPOL handshake transported in them.
+        boolean qos = (fc0 & 0x80) != 0;
+        // A QoS data frame carrying the Order bit (fc1 bit 7) also carries a
+        // 4-byte HT Control field after the QoS Control field (802.11n).
+        int htControl = (qos && (fc1 & 0x80) != 0) ? 4 : 0;
+        int headerEnd = off + 24 + (fourAddress ? 6 : 0) + (qos ? 2 : 0) + htControl;
 
         String addr1 = mac(frame, off + 4);
         String addr2 = mac(frame, off + 10);

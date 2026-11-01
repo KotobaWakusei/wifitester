@@ -36,6 +36,11 @@ public final class SettingsFragment extends Fragment {
     private TextView rootState;
     /** The tools card is replaced in place instead of recreating the activity. */
     private LinearLayout toolsCard;
+    /**
+     * dialogs are shown without a DialogFragment, so a rotation would leak
+     * their window; the active one is dismissed when the view is destroyed.
+     */
+    private androidx.appcompat.app.AlertDialog activeDialog;
 
     /**
      * The attached host context. The framework {@code Fragment} API has no
@@ -218,13 +223,21 @@ public final class SettingsFragment extends Fragment {
             return;
         }
         rootState.setText(getString(R.string.settings_root_state_checking));
+        // Capture the host once: getActivity() is read twice on different
+        // threads below, and the second read can return null after a rotation
+        // while the first read passed.
+        final Activity activity = getActivity();
+        if (activity == null) {
+            return;
+        }
+        final Context appContext = activity.getApplicationContext();
         new Thread(() -> {
-            boolean granted = RootShell.hasRoot(getContext());
-            if (getActivity() == null) {
-                return;
-            }
-            getActivity().runOnUiThread(() -> {
-                if (rootState == null) {
+            boolean granted = RootShell.hasRoot(appContext);
+            activity.runOnUiThread(() -> {
+                // A rotation detaches this fragment while hasRoot() blocks;
+                // Fragment.getString() would then throw, so only touch the
+                // views while still attached.
+                if (rootState == null || !isAdded()) {
                     return;
                 }
                 rootState.setText(granted
@@ -255,6 +268,7 @@ public final class SettingsFragment extends Fragment {
                     .setNegativeButton(getString(R.string.action_cancel), (d, which) ->
                             SettingsStore.setAttackAuthorized(host(), false))
                     .create();
+            activeDialog = dialog;
             // Dismissing the dialog in any other way must not leave the switch
             // in a state that does not match the stored authorization.
             dialog.setOnDismissListener(d -> {
@@ -488,20 +502,23 @@ public final class SettingsFragment extends Fragment {
             final ToolPackageManager toolManager = new ToolPackageManager(context);
             final boolean installed = toolManager.isPackageInstalled(pkg);
             activity.runOnUiThread(() -> {
-                if (activity.isFinishing()) return;
+                // A rotation rebuilds the activity without finishing it, so
+                // isFinishing() alone missed the case where this fragment is
+                // already detached and Fragment.getString() would throw.
+                if (activity.isFinishing() || !isAdded()) return;
                 MainActivity.notify(activity, installed
-                        ? getString(R.string.tools_repair_done, pkg.name)
-                        : getString(R.string.tools_repair_failed, result.message));
+                        ? activity.getString(R.string.tools_repair_done, pkg.name)
+                        : activity.getString(R.string.tools_repair_failed, result.message));
                 refreshSettings();
             });
         }, "wifitester-tool-repair").start();
     }
 
     private void showUninstallDialog(ToolPackageManager.ToolPackage pkg) {
-        new MaterialAlertDialogBuilder(host())
+        androidx.appcompat.app.AlertDialog dialog = new MaterialAlertDialogBuilder(host())
                 .setTitle(getString(R.string.tools_uninstall_title))
                 .setMessage(getString(R.string.tools_uninstall_confirm, pkg.name))
-                .setPositiveButton(getString(R.string.action_yes), (dialog, which) -> {
+                .setPositiveButton(getString(R.string.action_yes), (d, which) -> {
                     ToolPackageManager toolManager = new ToolPackageManager(getActivity());
                     long freed = toolManager.uninstallPackage(pkg);
                     MainActivity.notify(getActivity(), getString(R.string.tools_uninstalled,
@@ -509,7 +526,9 @@ public final class SettingsFragment extends Fragment {
                     refreshSettings();
                 })
                 .setNegativeButton(getString(R.string.action_no), null)
-                .show();
+                .create();
+        activeDialog = dialog;
+        dialog.show();
     }
     
     private void startDownload(ToolPackageManager.ToolPackage pkg) {
@@ -584,13 +603,24 @@ public final class SettingsFragment extends Fragment {
         super.onPause();
     }
 
+    @Override
+    public void onDestroyView() {
+        // Bare dialogs are not retained across configuration changes; letting
+        // them open would leak the window of the destroyed view.
+        if (activeDialog != null && activeDialog.isShowing()) {
+            activeDialog.dismiss();
+        }
+        activeDialog = null;
+        super.onDestroyView();
+    }
+
     /**
      * Rebuilds only the tool card so the new install state shows up without
      * recreating the activity (which would jump back to the first tab).
      */
     private void refreshSettings() {
         Activity activity = getActivity();
-        if (activity == null || toolsCard == null) return;
+        if (activity == null || toolsCard == null || !isAdded()) return;
         View parent = (View) toolsCard.getParent();
         if (!(parent instanceof LinearLayout)) return;
         LinearLayout root = (LinearLayout) parent;

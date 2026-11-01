@@ -164,7 +164,10 @@ final class IwMonitorModeBackend implements MonitorModeBackend {
                 // virtual interface path work. WifiRecovery re-enables it after
                 // the stop; the state is logged so cleanup can report it.
                 "echo START_STAGE:wifi-off; " +
-                "WIFI_WAS_ON=$(cmd wifi status 2>/dev/null | head -n 1 | grep -c 'Wifi is enabled'); " +
+                // "grep -c" exits 1 when the Wi-Fi is already off, and a failing
+                // assignment trips "set -e", aborting the whole start script.
+                // "|| true" keeps the printed count while clearing the status.
+                "WIFI_WAS_ON=$(cmd wifi status 2>/dev/null | head -n 1 | grep -c 'Wifi is enabled' || true); " +
                 "echo WIFI_WAS_ENABLED:$WIFI_WAS_ON; " +
                 "if [ \"$WIFI_WAS_ON\" = 1 ]; then svc wifi disable >/dev/null 2>&1 || true; " +
                 "N=0; while [ \"$N\" -lt 15 ] && cmd wifi status 2>/dev/null | head -n 1 | grep -q 'Wifi is enabled'; do N=$((N+1)); sleep 0.2; done; fi; " +

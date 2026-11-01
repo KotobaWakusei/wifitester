@@ -383,13 +383,23 @@ public final class UiKit {
         return view;
     }
 
-    /** Horizontal signal-strength meter built from filled/empty segments. */
+    /**
+     * Horizontal signal-strength meter built from filled/empty segments.
+     *
+     * <p>{@code maxLevel} is the RSSI of an excellent link (typically -50 dBm)
+     * and the scale extends in 10 dBm steps towards weaker signals, so the
+     * thresholds light the segments from left to right as the signal gets
+     * stronger. The previous formula (maxLevel·(i+1)/segments) only works for
+     * 0-strongest scales and produced thresholds like -12…-50 that no real
+     * RSSI could ever satisfy, in reverse order.</p>
+     */
     public static LinearLayout signalMeter(Activity activity, int level, int maxLevel) {
         LinearLayout meter = new LinearLayout(activity);
         meter.setOrientation(LinearLayout.HORIZONTAL);
         int segments = 4;
+        int step = 10;
         for (int i = 0; i < segments; i++) {
-            int threshold = (int) Math.ceil((double) maxLevel * (i + 1) / segments);
+            int threshold = maxLevel - step * i;   // -50, -60, -70, -80
             boolean active = level >= threshold;
             View bar = new View(activity);
             bar.setBackground(round(color(activity, active ? ACCENT : LINE, Color.GRAY), dp(activity, 2)));

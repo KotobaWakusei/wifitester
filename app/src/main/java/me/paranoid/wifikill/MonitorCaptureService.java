@@ -121,6 +121,13 @@ public final class MonitorCaptureService extends Service {
     private volatile int frameLimit;
     private volatile int snaplen;
     private volatile boolean running;
+    /**
+     * Set when the service was launched via {@code startForegroundService()}:
+     * from that moment {@code startForeground()} must be called once, or the
+     * system crashes the process after the grace period. Every early-exit
+     * path in {@link #startInternal} has to respect it.
+     */
+    private volatile boolean foregroundObligation;
     private volatile Process capture;
     /** Channel-hopping loop; runs beside the capture and dies with the service. */
     private volatile boolean hopping;
@@ -219,6 +226,9 @@ public final class MonitorCaptureService extends Service {
             stopSelf();
             return START_NOT_STICKY;
         }
+        // startForegroundService() creates a hard contract: startForeground()
+        // must run before this service stops again.
+        foregroundObligation = true;
         startInternal(intent);
         return START_NOT_STICKY;
     }
@@ -240,6 +250,14 @@ public final class MonitorCaptureService extends Service {
         hopChannels = parseHopChannels(intent.getStringExtra(EXTRA_HOP_CHANNELS));
         hopIntervalMs = Math.max(500, intent.getIntExtra(EXTRA_HOP_INTERVAL, 2000));
         if (!isValidInterface(interfaceName) || targetPath.isEmpty() || snaplen <= 0 || frameLimit <= 0) {
+            // A startForegroundService() request must call startForeground()
+            // even when it refuses the parameters, otherwise the system
+            // crashes the process once the grace period expires.
+            try {
+                postForeground();
+            } catch (RuntimeException ignored) {
+                // Nothing more can be done; stopping is the safe exit.
+            }
             stopSelf();
             return false;
         }
@@ -248,16 +266,19 @@ public final class MonitorCaptureService extends Service {
         hopping = intent.getBooleanExtra(EXTRA_HOPPING, false) && hopChannels.length > 1;
         acquireWakeLock();
         try {
-            Notification notification = buildNotification(0L);
-            if (Build.VERSION.SDK_INT >= 34) {
-                startForeground(NOTIFICATION_ID, notification,
-                        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
-            } else {
-                startForeground(NOTIFICATION_ID, notification);
-            }
+            postForeground();
         } catch (RuntimeException denied) {
-            // Without the notification the capture still runs while the
-            // activity is alive; the user simply loses the stop button.
+            if (foregroundObligation) {
+                // The FGS contract was not fulfilled; continuing would get the
+                // process killed by the system. The bound activity (or the
+                // start caller) reports the refusal through this return value.
+                releaseWakeLock();
+                stopSelf();
+                return false;
+            }
+            // Bound-only start without a foreground obligation: the capture
+            // still runs while the activity is alive; the user simply loses
+            // the notification stop button.
         }
         Thread worker = new Thread(this::capture, "wifitester-capture");
         worker.setDaemon(true);
@@ -269,6 +290,27 @@ public final class MonitorCaptureService extends Service {
         broadcastState();
         notifyListener();
         return true;
+    }
+
+    /**
+     * Ends the session once the capture process is gone. tcpdump exits by
+     * itself when the frame limit is reached, so without this the service kept
+     * reporting {@code running} forever: the notification never cleared, the
+     * monitor interface was never restored, Wi-Fi stayed off and every new
+     * start attempt was silently swallowed by {@code if (running) return true}.
+     */
+    private void endSession() {
+        running = false;
+        if (sessionId == LIVE_SESSION.get()) LIVE_SESSION.set(0L);
+        releaseWakeLock();
+        stopHopThread();
+        // The state broadcast with running=false is what tells a visible
+        // activity to run the interface restore.
+        broadcastState();
+        NotificationManager manager =
+                (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        if (manager != null) manager.cancel(NOTIFICATION_ID);
+        stopSelf();
     }
 
     @Override public void onDestroy() {
@@ -557,6 +599,12 @@ public final class MonitorCaptureService extends Service {
             capture = null;
             // Hopping must never outlive the capture it tunes for.
             stopHopThread();
+            // The capture process is gone (frame limit reached, tcpdump
+            // crashed, or the su wrapper died): end the session so the
+            // notification clears, the interface is restored and a new
+            // capture can start. Safe to run twice; the stop() race path
+            // above already ended the session via onDestroy.
+            endSession();
         }
     }
 
@@ -616,6 +664,17 @@ public final class MonitorCaptureService extends Service {
         channel.setDescription(getString(R.string.capture_notification_channel_detail));
         channel.setShowBadge(false);
         manager.createNotificationChannel(channel);
+    }
+
+    /** Promotes the service to foreground with the initial notification. */
+    private void postForeground() {
+        Notification notification = buildNotification(0L);
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(NOTIFICATION_ID, notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+        } else {
+            startForeground(NOTIFICATION_ID, notification);
+        }
     }
 
     private Notification buildNotification(long bytes) {

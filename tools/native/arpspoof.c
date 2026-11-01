@@ -106,11 +106,20 @@ static int read_ipv4(const char *interface_name, struct in_addr *address) {
     memset(&request, 0, sizeof(request));
     strncpy(request.ifr_name, interface_name, IFNAMSIZ - 1);
     if (ioctl(control, SIOCGIFADDR, &request) < 0) {
+        int saved = errno;
         close(control);
+        errno = saved;
         return -1;
     }
     close(control);
-    memcpy(address, &request.ifr_addr, sizeof(struct in_addr));
+    /* ifr_addr is a struct sockaddr: sin_family sits at offset 0-1 and
+     * sin_port at 2-3, so copying the first sizeof(struct in_addr) bytes
+     * produced "2.0.0.0" (family + port) instead of the real address. */
+    const struct sockaddr_in *sin = (const struct sockaddr_in *)&request.ifr_addr;
+    if (sin->sin_family != AF_INET) {
+        return -1;
+    }
+    memcpy(address, &sin->sin_addr, sizeof(struct in_addr));
     return 0;
 }
 

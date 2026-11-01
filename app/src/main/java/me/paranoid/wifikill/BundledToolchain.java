@@ -25,6 +25,14 @@ public final class BundledToolchain {
      */
     private static volatile InstallResult cachedInstall;
     /**
+     * Guards {@link #install()} and {@link #reinstall()} process-wide. The
+     * lock must be shared by every instance: each shell command constructs a
+     * new BundledToolchain, and an instance-level monitor would let two
+     * installs race on the same {@code <name>.new} temp files and commit a
+     * half-written binary.
+     */
+    private static final Object INSTALL_LOCK = new Object();
+    /**
      * Process-wide link prelude. A new BundledToolchain is constructed for
      * every shell command; the instance version of this cache was therefore
      * re-scanning the binaries from flash on each {@code su -c} call.
@@ -51,13 +59,25 @@ public final class BundledToolchain {
      * once. Used by the repair action for a toolchain that was deleted or
      * truncated behind the app's back.
      */
-    public synchronized InstallResult reinstall() {
-        cachedInstall = null;
-        return install();
+    public InstallResult reinstall() {
+        synchronized (INSTALL_LOCK) {
+            cachedInstall = null;
+            // Force the aircrack link prelude to be rebuilt from the fresh
+            // binaries instead of reusing a scan of the old (or empty) ones.
+            aircrackPathPrelude = null;
+            return installLocked();
+        }
     }
 
     /** Copies packaged assets to app-private storage and marks executable files executable. */
-    public synchronized InstallResult install() {
+    public InstallResult install() {
+        synchronized (INSTALL_LOCK) {
+            return installLocked();
+        }
+    }
+
+    /** Install body; callers must hold {@link #INSTALL_LOCK}. */
+    private InstallResult installLocked() {
         if (cachedInstall != null) return cachedInstall;
         ArrayList<String> installed = new ArrayList<>();
         ArrayList<String> errors = new ArrayList<>();
@@ -125,6 +145,9 @@ public final class BundledToolchain {
         if (errors.isEmpty()) {
             cachedInstall = new InstallResult(installed, errors,
                     installed.isEmpty() ? context.getString(R.string.bundled_none_found) : context.getString(R.string.bundled_installed));
+            // Fresh or repaired binaries: rebuild the aircrack link prelude on
+            // the next shellEnvironment() call so it reflects what is on disk.
+            aircrackPathPrelude = null;
             return cachedInstall;
         }
         return new InstallResult(installed, errors,
@@ -167,7 +190,14 @@ public final class BundledToolchain {
             // A scan failure must never break the tool environment.
         }
         String result = commands.toString();
-        aircrackPathPrelude = result;
+        // An empty scan usually means the toolchain was not extracted yet;
+        // caching it would keep aircrack-ng from ever getting its library
+        // links for the rest of the process. Only cache the empty result once
+        // a completed install confirms there are genuinely no aircrack
+        // binaries on this build.
+        if (!result.isEmpty() || cachedInstall != null) {
+            aircrackPathPrelude = result;
+        }
         return result;
     }
 

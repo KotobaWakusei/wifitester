@@ -586,13 +586,19 @@ public final class WifiListFragment extends Fragment {
     }
 
     private void checkRootWarning() {
+        // Capture the host once: the two getActivity() reads below are on
+        // different threads and the second could return null after a detach,
+        // throwing an NPE from this uncaught background thread.
+        final android.app.Activity activity = getActivity();
+        if (activity == null) {
+            return;
+        }
+        final android.content.Context appContext =
+                activity.getApplicationContext();
         new Thread(() -> {
-            boolean granted = RootShell.hasRoot(getContext());
-            if (getActivity() == null) {
-                return;
-            }
-            getActivity().runOnUiThread(() -> {
-                if (rootWarning == null) {
+            boolean granted = RootShell.hasRoot(appContext);
+            activity.runOnUiThread(() -> {
+                if (rootWarning == null || !isAdded()) {
                     return;
                 }
                 rootAvailable = granted;

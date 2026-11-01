@@ -87,10 +87,19 @@ final class RootShell {
                 }
             }
             if (finished) {
-                try {
-                    reader.join(1500L);
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
+                // A single join(1500) could give up while the reader still
+                // holds unread output, reporting "exit 0" with a truncated
+                // buffer. Drain with repeated short joins until the reader
+                // dies or the total grace window (equal to the command
+                // timeout) is spent.
+                long drainDeadline = System.currentTimeMillis() + timeoutMs;
+                while (reader.isAlive() && System.currentTimeMillis() < drainDeadline) {
+                    try {
+                        reader.join(100L);
+                    } catch (InterruptedException interrupted) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
                 }
             } else {
                 process.destroy();

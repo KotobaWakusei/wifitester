@@ -40,6 +40,11 @@ public class AttackCommandBuilderTest {
                 () -> AttackCommandBuilder.requirePath("/tmp/$(id)", R.string.attack_label_capture_file));
         assertThrows(IllegalArgumentException.class,
                 () -> AttackCommandBuilder.requirePath("/tmp/a b", R.string.attack_label_capture_file));
+        // Dot segments must not be able to escape the intended directory.
+        assertThrows(IllegalArgumentException.class,
+                () -> AttackCommandBuilder.requirePath("/data/../../x", R.string.attack_label_capture_file));
+        assertThrows(IllegalArgumentException.class,
+                () -> AttackCommandBuilder.requirePath("/data/./x", R.string.attack_label_capture_file));
         assertEquals("/data/local/tmp/x.pcap",
                 AttackCommandBuilder.requirePath("/data/local/tmp/x.pcap", R.string.attack_label_capture_file));
     }
@@ -77,23 +82,26 @@ public class AttackCommandBuilderTest {
     @Test public void buildsDeauthCommandWithAndWithoutClient() {
         String command = AttackCommandBuilder.deauth(
                 "aireplay-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", null, 10);
-        assertEquals("aireplay-ng --deauth 10 -a aa:bb:cc:dd:ee:ff -i wfkmon0", command);
+        // The replay interface is aireplay-ng's positional argument.
+        assertEquals("aireplay-ng --deauth 10 -a aa:bb:cc:dd:ee:ff wfkmon0", command);
 
         String targeted = AttackCommandBuilder.deauth(
                 "aireplay-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", "11:22:33:44:55:66", 0);
-        assertTrue(targeted.endsWith("-c 11:22:33:44:55:66"));
+        assertTrue(targeted.endsWith("-c 11:22:33:44:55:66 wfkmon0"));
         assertTrue(targeted.contains("--deauth 0"));
     }
 
     @Test public void buildsBeaconAndAuthFloodCommands() {
         String beacon = AttackCommandBuilder.beaconFlood(
                 "aireplay-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", 5);
-        assertEquals("aireplay-ng --fakeauth 5 -i wfkmon0 -a aa:bb:cc:dd:ee:ff", beacon);
+        assertEquals("aireplay-ng --fakeauth 5 -a aa:bb:cc:dd:ee:ff wfkmon0", beacon);
 
         String auth = AttackCommandBuilder.authFlood(
                 "aireplay-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", 5);
-        assertTrue(auth.contains("--auth"));
+        // aireplay-ng has no "--auth" option; the interface is positional.
+        assertFalse(auth.contains("--auth"));
         assertTrue(auth.contains("-a aa:bb:cc:dd:ee:ff"));
+        assertTrue(auth.endsWith("wfkmon0"));
     }
 
     @Test public void buildsHandshakeCaptureCommand() {
@@ -102,6 +110,10 @@ public class AttackCommandBuilderTest {
         assertTrue(command.contains("--bssid aa:bb:cc:dd:ee:ff"));
         assertTrue(command.contains("-c 6"));
         assertTrue(command.contains("-w /data/user/0/app/files/out"));
+        // airodump-ng's "-i" switch means "IVs only" and would drop EAPOL
+        // frames; the interface must be the trailing positional argument.
+        assertFalse(command.contains(" -i "));
+        assertTrue(command.endsWith("wfkmon0"));
     }
 
     @Test public void rejectsInvalidChannelForHandshakeCapture() {
@@ -109,6 +121,13 @@ public class AttackCommandBuilderTest {
                 "airodump-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", 0, "/data/local/tmp/out"));
         assertThrows(IllegalArgumentException.class, () -> AttackCommandBuilder.captureHandshake(
                 "airodump-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", 6, "relative"));
+        assertThrows(IllegalArgumentException.class, () -> AttackCommandBuilder.captureHandshake(
+                "airodump-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", 234, "/data/local/tmp/out"));
+        // 6 GHz channels run up to 233 and must stay acceptable.
+        assertEquals("airodump-ng --bssid aa:bb:cc:dd:ee:ff -c 233"
+                        + " -w /data/local/tmp/out --ignore-negative-one wfkmon0",
+                AttackCommandBuilder.captureHandshake(
+                        "airodump-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", 233, "/data/local/tmp/out"));
     }
 
     @Test public void buildsOfflineCrackCommand() {

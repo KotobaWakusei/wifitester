@@ -93,7 +93,7 @@ public final class AttackActivity extends BaseActivity {
     private boolean rootGranted;
     private boolean monitorPresent;
     private ToolPackageManager.DeviceMonitorCapability monitorCapability = ToolPackageManager.DeviceMonitorCapability.UNKNOWN;
-    private final java.util.Map<String, String> toolPaths = new java.util.LinkedHashMap<>();
+    private final java.util.Map<String, String> toolPaths = new java.util.concurrent.ConcurrentHashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -454,7 +454,9 @@ public final class AttackActivity extends BaseActivity {
                 append(getString(R.string.attack_device_info, describeCapability(deviceCapability)));
                 
                 boolean authorized = SettingsStore.attackAuthorized(this);
-                startButton.setEnabled(hasRoot && authorized);
+                // Never re-enable the start button while a module is still
+                // running: overwriting "managed" would leak the old process.
+                startButton.setEnabled(hasRoot && authorized && managed == null);
                 if (!authorized) {
                     append(getString(R.string.attack_not_authorized));
                 }
@@ -549,6 +551,11 @@ public final class AttackActivity extends BaseActivity {
     // ---- execution --------------------------------------------------------
 
     private void confirmStart() {
+        if (managed != null) {
+            // A module is already running; starting another would leak it.
+            toast(getString(R.string.attack_module_running));
+            return;
+        }
         if (!rootGranted) {
             toast(getString(R.string.attack_needs_root));
             return;
@@ -726,7 +733,11 @@ public final class AttackActivity extends BaseActivity {
                 if (files != null) {
                     long newest = Long.MIN_VALUE;
                     for (File file : files) {
-                        if (file.isFile() && file.lastModified() > newest) {
+                        // airodump-ng writes .cap/.csv/.kismet.csv/.log.csv with
+                        // the same prefix and nearly identical timestamps; only
+                        // the .cap file is a valid aircrack-ng input.
+                        if (file.isFile() && file.getName().endsWith(".cap")
+                                && file.lastModified() > newest) {
                             newest = file.lastModified();
                             capture = file.getAbsolutePath();
                         }
@@ -739,7 +750,9 @@ public final class AttackActivity extends BaseActivity {
             }
             case AttackCatalog.ID_EVIL_TWIN: {
                 File config = new File(getFilesDir(), "hostapd.conf");
-                String content = AttackCommandBuilder.buildHostapdConfig(MONITOR_INTERFACE,
+                // Use the detected monitor interface: a hardcoded name points
+                // hostapd at an interface that may not exist on this device.
+                String content = AttackCommandBuilder.buildHostapdConfig(monitorInterface,
                         "nl80211", ssid.isEmpty() ? bssid : ssid, channel, false,
                         passphrase, false);
                 try (Writer writer = new OutputStreamWriter(new FileOutputStream(config),
@@ -785,6 +798,7 @@ public final class AttackActivity extends BaseActivity {
     }
 
     private void launch(AttackCatalog.Module module, String command) {
+        if (managed != null) return;
         append("===== " + getString(module.titleRes) + " =====");
         append(getString(R.string.attack_command_running, command));
         
@@ -805,15 +819,17 @@ public final class AttackActivity extends BaseActivity {
         if (pageScroll != null) pageScroll.post(() -> pageScroll.fullScroll(View.FOCUS_DOWN));
         
         // 添加启动提示
-        append(getString(R.string.attack_module_started, module.titleRes));
+        append(getString(R.string.attack_module_started, getString(module.titleRes)));
 
         managed = RootProcess.start(this, command, new RootProcess.OutputListener() {
             @Override
             public void onLine(String line) {
                 append(line);
-                // 实时更新攻击状态
+                // 实时更新攻击状态。onLine runs on the RootProcess output
+                // thread; views may only be touched on the UI thread.
                 if (line.contains("sent") || line.contains("packets")) {
-                    updateAttackStatus(getString(R.string.attack_status_sending), ACCENT);
+                    runOnUiThread(() -> updateAttackStatus(
+                            getString(R.string.attack_status_sending), ACCENT));
                 }
             }
 
@@ -899,6 +915,9 @@ public final class AttackActivity extends BaseActivity {
         if (autofillButton == null) return;
         final String preferredBssid = bssidInput.getText().toString().trim();
         final String preferredSsid = ssidInput.getText().toString().trim();
+        // SpannableStringBuilder is not thread safe: snapshot editable fields
+        // here on the UI thread instead of reading them from the worker.
+        final String dataInterface = dataInterfaceInput.getText().toString().trim();
         if (includeLocal) {
             autofillButton.setEnabled(false);
             autofillState.setText(getString(R.string.attack_autofill_running));
@@ -913,14 +932,14 @@ public final class AttackActivity extends BaseActivity {
                         "ip -4 addr show 2>/dev/null", RootShell.TIMEOUT_SHORT);
                 network = AttackTargetResolver.parseLocalNetwork(route.output, address.output);
                 String iface = network.routeInterface.isEmpty()
-                    ? dataInterfaceInput.getText().toString().trim() : network.routeInterface;
+                    ? dataInterface : network.routeInterface;
                 if (iface.matches("[A-Za-z0-9_.-]{1,15}")) {
                     RootShell.Result neighbours = RootShell.run(this,
                             "ip -4 neigh show dev " + iface + " 2>/dev/null", RootShell.TIMEOUT_SHORT);
                     neighbourOutput = neighbours.output;
                 }
             }
-            List<AttackTargetResolver.AccessPoint> scanned = scanAccessPoints();
+            List<AttackTargetResolver.AccessPoint> scanned = scanAccessPoints(dataInterface);
             final AttackTargetResolver.LocalNetwork local = network;
             final List<AttackTargetResolver.AccessPoint> accessPoints = scanned;
             final String neighbours = neighbourOutput;
@@ -934,7 +953,7 @@ public final class AttackActivity extends BaseActivity {
      * is rate limited; "iw scan" is more complete and works from the monitor
      * mode toolchain. Both are best effort and may return an empty list.
      */
-    private List<AttackTargetResolver.AccessPoint> scanAccessPoints() {
+    private List<AttackTargetResolver.AccessPoint> scanAccessPoints(String dataInterface) {
         try {
             android.net.wifi.WifiManager wifi = (android.net.wifi.WifiManager)
                     getApplicationContext().getSystemService(android.content.Context.WIFI_SERVICE);
@@ -957,7 +976,7 @@ public final class AttackActivity extends BaseActivity {
         } catch (Exception ignored) {
             // A vendor scan service can fail; iw remains as fallback.
         }
-        String iface = dataInterfaceInput == null ? "" : dataInterfaceInput.getText().toString().trim();
+        String iface = dataInterface == null ? "" : dataInterface.trim();
         if (!iface.matches("[A-Za-z0-9_.-]{1,15}")) return new ArrayList<>();
         RootShell.Result scan = RootShell.run(this,
                 "iw dev " + iface + " scan 2>/dev/null", RootShell.TIMEOUT_LONG);
@@ -1316,9 +1335,12 @@ public final class AttackActivity extends BaseActivity {
         stopElapsed();
         getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         RootProcess process = managed;
+        managed = null;
         if (process != null) {
-            process.stop();
-            managed = null;
+            // stop() blocks for up to several seconds (TERM, grace period,
+            // KILL); it must not run on the main thread or leaving the screen
+            // can ANR while the tool ignores SIGTERM.
+            new Thread(() -> process.stop(), "wifitester-attack-destroy").start();
         }
         super.onDestroy();
     }

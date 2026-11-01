@@ -46,6 +46,14 @@ public class ToolInstallerService extends Service {
 
     private ExecutorService executor;
     private volatile boolean isRunning = false;
+    /**
+     * Set when the service is destroyed (user stop, system teardown) so the
+     * running download/extract worker aborts itself. {@code shutdown()} alone
+     * never cancelled the task: the worker kept writing files while the old
+     * onDestroy rolled them back on the main thread, racing rename against
+     * delete and leaving half-installed packages behind.
+     */
+    private volatile boolean cancelled = false;
     /** The package currently being downloaded, used for rollback on destroy. */
     private volatile ToolPackageManager.ToolPackage currentPackage;
 
@@ -103,6 +111,11 @@ public class ToolInstallerService extends Service {
             }
             notifyProgress(this, packageId, true, false, getString(R.string.tool_download_starting));
             executor.execute(() -> downloadPackage(packageId, packageName));
+        } else {
+            // A second request while busy used to vanish silently; tell the
+            // caller so the card can explain why nothing happened.
+            notifyProgress(this, packageId, false, false,
+                    getString(R.string.tool_download_busy));
         }
 
         // Not sticky: re-creating the service with a null Intent would start a
@@ -115,20 +128,12 @@ public class ToolInstallerService extends Service {
     public void onDestroy() {
         super.onDestroy();
         isRunning = false;
+        // Ask the worker to abort; it owns the rollback (uninstall of the
+        // partial package) and the final progress broadcast, so the cleanup
+        // can no longer race the extraction.
+        cancelled = true;
         if (executor != null) {
-            executor.shutdown();
-        }
-        // A destroyed service leaves whatever it extracted so far behind. Those
-        // files would make a later "installed" check disagree with the flag.
-        ToolPackageManager.ToolPackage interrupted = currentPackage;
-        if (interrupted != null) {
-            currentPackage = null;
-            // Only a preinstalled package is untouched: its tools ship with the APK.
-            if (!new ToolPackageManager(this).isPreInstalled(interrupted)) {
-                new ToolPackageManager(this).uninstallPackage(interrupted);
-            }
-            notifyProgress(this, interrupted.id, false, false,
-                    getString(R.string.tool_download_interrupted));
+            executor.shutdownNow();
         }
         NotificationManager manager = getSystemService(NotificationManager.class);
         if (manager != null) {
@@ -145,11 +150,14 @@ public class ToolInstallerService extends Service {
     private void downloadPackage(String packageId, String packageName) {
         boolean success = false;
         String message = getString(R.string.tool_download_failed, "");
+        ToolPackageManager toolManager = new ToolPackageManager(this);
         try {
-            ToolPackageManager toolManager = new ToolPackageManager(this);
             ToolPackageManager.ToolPackage pkg = getPackageById(packageId);
 
             currentPackage = pkg;
+            if (cancelled) {
+                throw new IOException(getString(R.string.tool_download_interrupted));
+            }
             if (pkg == null) {
                 message = getString(R.string.tool_package_unknown);
             } else if (toolManager.isPackageComplete(pkg)) {
@@ -184,12 +192,14 @@ public class ToolInstallerService extends Service {
             }
         } catch (Exception e) {
             Log.e(TAG, "Download failed", e);
-            message = getString(R.string.tool_download_failed, describeFailure(e));
+            message = cancelled
+                    ? getString(R.string.tool_download_interrupted)
+                    : getString(R.string.tool_download_failed, describeFailure(e));
             // An exception can hit between two extracted tools (interrupted
             // service, unwritable directory); never leave a half package.
             ToolPackageManager.ToolPackage pkg = getPackageById(packageId);
-            if (pkg != null && !new ToolPackageManager(this).isPreInstalled(pkg)) {
-                new ToolPackageManager(this).uninstallPackage(pkg);
+            if (pkg != null && !toolManager.isPreInstalled(pkg)) {
+                toolManager.uninstallPackage(pkg);
             }
         } finally {
             currentPackage = null;
@@ -264,6 +274,9 @@ public class ToolInstallerService extends Service {
                 int lastProgress = -1;
                 int n;
                 while ((n = in.read(buffer)) != -1) {
+                    if (cancelled) {
+                        throw new IOException(getString(R.string.tool_download_interrupted));
+                    }
                     copied += n;
                     if (copied > MAX_ARCHIVE_BYTES) {
                         throw new IOException(getString(R.string.tool_download_too_large,
@@ -406,6 +419,9 @@ public class ToolInstallerService extends Service {
                 byte[] buffer = new byte[16384];
                 int n;
                 while ((n = in.read(buffer)) != -1) {
+                    if (cancelled) {
+                        throw new IOException(getString(R.string.tool_download_interrupted));
+                    }
                     copied += n;
                     if (copied > MAX_EXTRACTED_BYTES) {
                         throw new IOException(getString(R.string.tool_extract_too_large,
@@ -415,7 +431,7 @@ public class ToolInstallerService extends Service {
                 }
                 out.getFD().sync();
             }
-            int exit = process.waitFor();
+            int exit = waitForOrKill(process, 60_000L);
             if (exit != 0) {
                 throw new IOException(getString(R.string.tool_extract_failed, exit));
             }
@@ -425,13 +441,35 @@ public class ToolInstallerService extends Service {
         try (InputStream in = process.getInputStream()) {
             byte[] buffer = new byte[16384];
             int n;
-            while ((n = in.read(buffer)) != -1) text.write(buffer, 0, n);
+            while ((n = in.read(buffer)) != -1) {
+                if (cancelled) {
+                    throw new IOException(getString(R.string.tool_download_interrupted));
+                }
+                text.write(buffer, 0, n);
+            }
         }
-        int exit = process.waitFor();
+        int exit = waitForOrKill(process, 60_000L);
         if (exit != 0) {
             throw new IOException(getString(R.string.tool_extract_failed, exit));
         }
         return text.toString("UTF-8").split("\\r?\\n");
+    }
+
+    /**
+     * Waits for a child process with a deadline; a hung tar must not pin the
+     * executor thread (and with it the whole service) forever.
+     */
+    private static int waitForOrKill(Process process, long timeoutMs) throws InterruptedException {
+        if (process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+            return process.exitValue();
+        }
+        process.destroyForcibly();
+        if (process.waitFor(timeoutMs, java.util.concurrent.TimeUnit.MILLISECONDS)) {
+            return process.exitValue();
+        }
+        // Still not reaped after a forced kill: report failure without
+        // throwing IllegalThreadStateException from exitValue().
+        return -1;
     }
 
     /** Resolves a tar implementation usable from the app sandbox. */

@@ -199,7 +199,27 @@ public final class MainActivity extends BaseActivity {
         if (container == null || container.getChildCount() == 0) {
             return;
         }
-        View page = container.getChildAt(0);
+        // Animate the view of the tab that was just selected. The container
+        // keeps all three fragments, and child 0 is always the (hidden) Wi-Fi
+        // page, so animating it made every other tab appear without a
+        // transition.
+        View page = null;
+        Fragment selected = getSupportFragmentManager()
+                .findFragmentByTag(TAB_TAGS[clampTab(selectedTab)]);
+        if (selected != null && selected.getView() != null) {
+            page = selected.getView();
+        } else {
+            for (int i = 0; i < container.getChildCount(); i++) {
+                View child = container.getChildAt(i);
+                if (child.getVisibility() == View.VISIBLE) {
+                    page = child;
+                    break;
+                }
+            }
+        }
+        if (page == null) {
+            return;
+        }
         page.setAlpha(0f);
         page.setTranslationY(dp(8));
         page.animate().alpha(1f).translationY(0f).setDuration(220)

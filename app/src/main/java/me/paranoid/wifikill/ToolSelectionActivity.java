@@ -41,9 +41,14 @@ public class ToolSelectionActivity extends AppCompatActivity {
         
         statusHint = findViewById(R.id.package_status_hint);
 
-        // 内置工具包随 APK 一起分发，启动时即解包，界面才能显示真实状态
-        new BundledToolchain(this).install();
-        
+        // 内置工具包随 APK 一起分发，启动时即解包，界面才能显示真实状态。
+        // 解包加 SHA-256 校验是数 MB 的磁盘 I/O，放在后台线程执行，避免
+        // 首帧渲染被阻塞（低端机首启可触发 ANR）。
+        new Thread(() -> {
+            new BundledToolchain(this).install();
+            runOnUiThread(this::initPackageSelection);
+        }, "wifitester-bundled-install").start();
+
         initPackageSelection();
         continueButton.setEnabled(false);
         
@@ -61,28 +66,41 @@ public class ToolSelectionActivity extends AppCompatActivity {
     }
 
     private void initPackageSelection() {
+        // Preserve what the user ticked: every progress broadcast used to
+        // rebuild the list from scratch, silently resetting the checkboxes of
+        // packages that were still downloading.
+        java.util.Set<String> selections = new java.util.HashSet<>();
+        for (int i = 0; i < packageContainer.getChildCount(); i++) {
+            View item = packageContainer.getChildAt(i);
+            CheckBox checkBox = item.findViewById(R.id.package_checkbox);
+            ToolPackageManager.ToolPackage tag =
+                    (ToolPackageManager.ToolPackage) checkBox.getTag();
+            if (tag != null && checkBox.isEnabled() && checkBox.isChecked()) {
+                selections.add(tag.id);
+            }
+        }
         List<ToolPackageManager.ToolPackage> packages = toolManager.getAllPackages();
         packageContainer.removeAllViews();
-        
+
         for (ToolPackageManager.ToolPackage pkg : packages) {
             View packageItem = getLayoutInflater().inflate(R.layout.item_tool_package, null);
-            
+
             CheckBox checkBox = packageItem.findViewById(R.id.package_checkbox);
             boolean installed = toolManager.isPackageInstalled(pkg);
             // 已安装的工具包不可取消；未安装的只是一个下载请求，勾选不等于已安装
             checkBox.setText(pkg.name);
             checkBox.setEnabled(!installed);
-            checkBox.setChecked(installed);
+            checkBox.setChecked(installed || selections.contains(pkg.id));
             checkBox.setTag(pkg);
-            
+
             TextView sizeText = packageItem.findViewById(R.id.package_size);
             sizeText.setText(updateSizeLabel(pkg));
-            
+
             // 为可选工具包添加工具列表说明
             if (!toolManager.isPreInstalled(pkg)) {
                 checkBox.setText(pkg.name + " (" + String.join(", ", pkg.tools) + ")");
             }
-            
+
             packageContainer.addView(packageItem);
         }
         updateStatusHint();

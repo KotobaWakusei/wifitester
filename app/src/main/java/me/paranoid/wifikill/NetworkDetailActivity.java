@@ -39,7 +39,8 @@ public final class NetworkDetailActivity extends BaseActivity {
     public static final String EXTRA_TIMESTAMP = "timestamp";
 
     private NetworkEntry entry;
-    private TextView pinButton;
+    /** Title TextView of the pin/unpin action row, updated in place. */
+    private TextView pinTitle;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -144,10 +145,15 @@ public final class NetworkDetailActivity extends BaseActivity {
         operations.addView(LightKit.divider(this));
 
         boolean pinned = SettingsStore.isPinned(this, entry.bssid);
-        pinButton = LightKit.text(this, pinned ? getString(R.string.detail_unpin) : getString(R.string.detail_pin), 14, LightKit.INK, true);
-        operations.addView(LightKit.actionRow(this, pinned ? getString(R.string.detail_unpin) : getString(R.string.detail_pin),
+        LinearLayout pinRow = LightKit.actionRow(this,
+                pinned ? getString(R.string.detail_unpin) : getString(R.string.detail_pin),
                 pinned ? getString(R.string.detail_unpin_detail) : getString(R.string.detail_pin_detail),
-                () -> togglePinned()));
+                this::togglePinned);
+        // The row's first child is the label column; its first child is the
+        // title. Keeping this reference lets togglePinned refresh the text the
+        // user actually sees (the previous pinButton was never attached).
+        pinTitle = (TextView) ((LinearLayout) pinRow.getChildAt(0)).getChildAt(0);
+        operations.addView(pinRow);
         operations.addView(LightKit.divider(this));
 
         operations.addView(LightKit.actionRow(this, getString(R.string.detail_open_monitor),
@@ -252,8 +258,8 @@ public final class NetworkDetailActivity extends BaseActivity {
     private void togglePinned() {
         SettingsStore.togglePinned(this, entry.bssid);
         boolean pinned = SettingsStore.isPinned(this, entry.bssid);
-        if (pinButton != null) {
-            pinButton.setText(pinned ? getString(R.string.detail_unpin) : getString(R.string.detail_pin));
+        if (pinTitle != null) {
+            pinTitle.setText(pinned ? getString(R.string.detail_unpin) : getString(R.string.detail_pin));
         }
         MainActivity.notify(this, pinned ? getString(R.string.detail_pinned_to_top) : getString(R.string.detail_unpinned));
     }
@@ -302,7 +308,10 @@ public final class NetworkDetailActivity extends BaseActivity {
         new MaterialAlertDialogBuilder(this)
                 .setTitle(getString(R.string.detail_forget))
                 .setMessage(getString(R.string.detail_forget_dialog, ssidLabel()))
-                .setPositiveButton(getString(R.string.action_cancel), (dialog, which) -> removeNetwork(manager, networkId))
+                // The confirmation button must not read "cancel": both buttons
+                // used to show "取消" while the first one actually deleted the
+                // saved credentials.
+                .setPositiveButton(getString(R.string.action_yes), (dialog, which) -> removeNetwork(manager, networkId))
                 .setNegativeButton(getString(R.string.action_cancel), null)
                 .show();
     }
@@ -333,8 +342,14 @@ public final class NetworkDetailActivity extends BaseActivity {
             return -1;
         }
         String currentBssid = info.getBSSID();
-        if (currentBssid != null && !entry.bssid.isEmpty()
-                && !currentBssid.equalsIgnoreCase(entry.bssid)) {
+        // A null BSSID (no location permission/switch on Android 10+) means the
+        // identity of the current connection cannot be verified: refusing is
+        // the only safe option. The previous logic skipped the comparison and
+        // returned the *current* network id, deleting a different network than
+        // the one shown on screen.
+        if (currentBssid == null || currentBssid.trim().isEmpty()
+                || entry.bssid.isEmpty()
+                || !currentBssid.equalsIgnoreCase(entry.bssid)) {
             return -1;
         }
         return info.getNetworkId();

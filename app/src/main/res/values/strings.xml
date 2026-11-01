@@ -533,6 +533,7 @@
     <string name="attack_monitor_only_blocked">当前驱动只有监听接收能力，不支持无线帧注入；已阻止此发送型模块。可使用被动抓包或支持注入的外接网卡。</string>
     <string name="attack_tools_header">工具：</string>
     <string name="attack_needs_root">需要 Root 权限</string>
+    <string name="attack_module_running">已有模块在运行，请先停止再启动新的模块</string>
     <string name="attack_capture_dir_failed">无法创建抓包目录</string>
     <string name="attack_hostapd_config_failed">无法写入 hostapd 配置：%1$s</string>
     <string name="attack_unknown_module">未知模块</string>
@@ -665,6 +666,7 @@
     <string name="tool_download_channel_desc">后台下载工具包时显示进度</string>
     <string name="tool_downloading">正在下载 %s</string>
     <string name="tool_download_starting">准备下载...</string>
+    <string name="tool_download_busy">已有下载在进行中，请等待其完成后再试</string>
     <string name="tool_download_progress">已完成 %1$d%%</string>
     <string name="tool_download_complete">下载完成</string>
     <string name="tool_download_failed_title">下载失败</string>

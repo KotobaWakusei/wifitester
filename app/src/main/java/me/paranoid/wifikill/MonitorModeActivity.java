@@ -51,6 +51,23 @@ public final class MonitorModeActivity extends BaseActivity {
     private volatile boolean running=false, createdMonitor=false, rootGranted=false;
     private volatile boolean probing=false;
     private volatile boolean channelHopping=false;
+    /**
+     * True between "rememberSession + ensureBound" and the moment the capture
+     * service confirms it is running. Without this flag the first
+     * onServiceConnected/onResume sync could mistake the freshly recorded
+     * session for one that "ended elsewhere" and delete the monitor interface
+     * that was just created.
+     */
+    private volatile boolean startInFlight=false;
+    /**
+     * Guards the restore sequence across activity instances: a rotation during
+     * the (long-running) root restore must not start a second one, and the
+     * stop button plus the notification action must not restore twice.
+     */
+    private static final java.util.concurrent.atomic.AtomicBoolean RESTORING =
+            new java.util.concurrent.atomic.AtomicBoolean(false);
+    /** The tcpdump pid already printed, so the 5 s heartbeat does not repeat it. */
+    private long lastLoggedPid=-1L;
     private String activeInterface="", selectedMonitor="wfkmon0";
     private String previousInterfaceState="unknown";
     /** QCACLD global con_mode switch discovered by the probe, or null. */
@@ -84,7 +101,10 @@ public final class MonitorModeActivity extends BaseActivity {
                 onCaptureEnded(hasExit ? exit : -1);
                 return;
             }
-            if (pid > 1L) append(getString(R.string.monitor_pid, String.valueOf(pid)));
+            if (pid > 1L && pid != lastLoggedPid) {
+                lastLoggedPid = pid;
+                append(getString(R.string.monitor_pid, String.valueOf(pid)));
+            }
             if (line != null && !line.isEmpty()) append(line);
             if (hasExit && !active) append(getString(R.string.monitor_capture_finished, exit,
                     latestCaptureFile == null ? 0L : latestCaptureFile.length()));
@@ -317,10 +337,13 @@ public final class MonitorModeActivity extends BaseActivity {
                         getString(tcpdump?R.string.monitor_tool_ok:R.string.monitor_tool_missing,"tcpdump"),
                         interfaces.size(),channels.size())+
                         getString(R.string.monitor_channels_note));
-                startButton.setEnabled(ok);
-                if(ifaceSpinner!=null) ifaceSpinner.setEnabled(!running);
-                if(channelSpinner!=null) channelSpinner.setEnabled(!running);
-                if(refreshButton!=null) refreshButton.setEnabled(!running);
+                // A restore in flight keeps the start button and the pickers
+                // locked, exactly like applyRunningState() would do.
+                boolean restoringNow=RESTORING.get();
+                startButton.setEnabled(ok&&!restoringNow);
+                if(ifaceSpinner!=null) ifaceSpinner.setEnabled(!running&&!restoringNow);
+                if(channelSpinner!=null) channelSpinner.setEnabled(!running&&!restoringNow);
+                if(refreshButton!=null) refreshButton.setEnabled(!running&&!restoringNow);
                 updateHopToggle();
                 append(detectedConMode!=null
                         ? getString(R.string.monitor_con_mode_detected,detectedConMode)
@@ -484,6 +507,10 @@ public final class MonitorModeActivity extends BaseActivity {
                 running=true;
                 applyRunningState();
                 capabilityState.setText(getString(R.string.monitor_started,channel.label));
+                // From here until the service confirms it is running, a sync
+                // must not interpret the fresh session record as "ended
+                // elsewhere" and tear the interface down again.
+                startInFlight=true;
                 rememberSession(oldState);
                 // Bind before starting the service: the capture state is then
                 // pushed to the UI without relying on broadcasts, and a failed
@@ -538,15 +565,18 @@ public final class MonitorModeActivity extends BaseActivity {
                                 hopChannelsSpec, 2000, channelHopping);
                 runOnUiThread(()->{
                     if(!started){
+                        startInFlight=false;
                         append(getString(R.string.monitor_capture_service_failed));
                         stopMonitor();
                         return;
                     }
+                    startInFlight=false;
                     append(getString(R.string.monitor_capture_started,packetLimit,snaplen,target.getName()));
                     append(getString(R.string.monitor_notification_running));
                     rememberSession(previousInterfaceState);
                 });
             }catch(Exception e){
+                startInFlight=false;
                 runOnUiThread(()->{
                     append(getString(R.string.monitor_capture_write_failed,e.getClass().getSimpleName()+": "+e.getMessage()));
                     stopMonitor();
@@ -566,6 +596,7 @@ public final class MonitorModeActivity extends BaseActivity {
             if(!state.targetPath.isEmpty()) latestCaptureFile=new File(state.targetPath);
             if(session!=null&&!state.interfaceName.isEmpty()) selectedMonitor=state.interfaceName;
             channelHopping=state.hopping;
+            startInFlight=false;   // the service is up: the start window is over
             if(!running){
                 running=true;
                 selectedMonitor=state.interfaceName;
@@ -581,21 +612,29 @@ public final class MonitorModeActivity extends BaseActivity {
         // The record must survive until restoreInterface() consumes it: clearing
         // it here made the guard in restoreInterface() return immediately, so
         // the interface was never brought back after a notification stop or an
-        // activity restart.
+        // activity restart. While a start is in flight, though, a fresh record
+        // simply means the service has not confirmed "running" yet: restoring
+        // here would delete the interface that was just created.
+        if(startInFlight){
+            return;
+        }
         if(SettingsStore.captureSessionActive(this)){
             // The capture file path was recorded when the session started;
             // without reading it back the export button stays disabled even
             // though the PCAP exists.
             recoverStoredCapturePath();
+            // Run the restore before refreshing the buttons: restoreInterface
+            // raises RESTORING synchronously, so applyRunningState() keeps the
+            // start button disabled while the restore is in flight.
+            restoreInterface(restoreFromStore());
             running=false;createdMonitor=false;channelHopping=false;
             applyRunningState();
-            restoreInterface(restoreFromStore());
         } else if(running){
             // The service is gone but we thought it was running (process death).
             recoverStoredCapturePath();
+            restoreInterface(restoreFromStore());
             running=false;createdMonitor=false;channelHopping=false;
             applyRunningState();
-            restoreInterface(restoreFromStore());
         }
     }
 
@@ -653,32 +692,46 @@ public final class MonitorModeActivity extends BaseActivity {
     }
 
     /**
-     * Runs the backend restore once per session. The session record is cleared
-     * before the work starts, so a duplicate stop request (button plus
-     * notification) cannot run the restore twice.
+     * Runs the backend restore once per session.
+     *
+     * <p>The persisted record is only cleared after the restore actually ran:
+     * clearing it up front meant that a refused root prompt or an 8 s timeout
+     * (RootShell kills the su process mid-script) left the monitor interface
+     * behind forever, because every retry entry point relies on the record.
+     * Duplicate requests (button plus notification, plus a re-sync after
+     * rotation) are instead prevented by the shared RESTORING flag.</p>
      */
     private void restoreInterface(String[] session){
         if(session==null||session.length<3)return;
         if(!SettingsStore.captureSessionActive(this)&&!running)return;
-        SettingsStore.clearCaptureSession(this);
+        if(!RESTORING.compareAndSet(false,true))return;
         final String iface=session[0].isEmpty()?activeInterface:session[0];
         final String monitor=session[1].isEmpty()?selectedMonitor:session[1];
         final String state=session[2].isEmpty()?previousInterfaceState:session[2];
         final boolean created=Boolean.parseBoolean(session[3]);
-        if(!iface.matches("[A-Za-z0-9_.-]{1,15}")||!monitor.matches("[A-Za-z0-9_.-]{1,15}"))return;
+        if(!iface.matches("[A-Za-z0-9_.-]{1,15}")||!monitor.matches("[A-Za-z0-9_.-]{1,15}")){
+            RESTORING.set(false);
+            return;
+        }
         append(getString(R.string.monitor_stopping));
         new Thread(()->{
             Result r=runRoot(monitorBackend.buildStopCommand(iface,monitor,state,conModePath),8000);
             boolean reconnect=WifiRecovery.requestReconnect(this);
             reconnect=WifiRecovery.reenableAfterConMode(this)||reconnect;
-            if(conModePath!=null&&r.output!=null&&r.output.contains("CON_MODE_RESTORED:0")){
-                append(getString(R.string.monitor_con_mode_restored,conModePath));
-            }
+            final boolean conModeRestored=conModePath!=null&&r.output!=null
+                    &&r.output.contains("CON_MODE_RESTORED:0");
+            final boolean restoreOk=r.code==0;
             final boolean reconnected=reconnect;
             final String restoreState=("up".equals(state)?"up":"down");
             final boolean canExport=isUsableCapture(latestCaptureFile);
             runOnUiThread(()->{
-                SettingsStore.clearCaptureSession(this);
+                if(restoreOk){
+                    // The restore script ran to completion; now the record can
+                    // go. On failure it stays, so the stop button, the next
+                    // onResume sync or a notification stop can retry.
+                    SettingsStore.clearCaptureSession(this);
+                }
+                RESTORING.set(false);
                 running=false;createdMonitor=false;
                 applyRunningState();
                 captureExportButton.setEnabled(canExport);
@@ -688,6 +741,9 @@ public final class MonitorModeActivity extends BaseActivity {
                         :getString(R.string.monitor_capture_no_data);
                 capabilityState.setText(getString(R.string.monitor_stopped,restoreState,captureState)
                         +getString(reconnected?R.string.monitor_reconnect_requested:R.string.monitor_reconnect_manual));
+                if(conModeRestored){
+                    append(getString(R.string.monitor_con_mode_restored,conModePath));
+                }
                 append(getString(R.string.monitor_restore_attempt,trim(r.output,1200)));
                 append(getString(R.string.monitor_stop_button_used));
             });
@@ -697,6 +753,10 @@ public final class MonitorModeActivity extends BaseActivity {
     /** Called when the service reports that the capture is gone. */
     private void onCaptureEnded(int exitCode){
         if(!running&&!SettingsStore.captureSessionActive(this))return;
+        // Start the restore first: it raises RESTORING synchronously, so the
+        // button refresh below cannot briefly re-enable the start button while
+        // the restore thread is still running.
+        restoreInterface(restoreFromStore());
         running=false;createdMonitor=false;channelHopping=false;
         applyRunningState();
         final boolean canExport=isUsableCapture(latestCaptureFile);
@@ -714,7 +774,6 @@ public final class MonitorModeActivity extends BaseActivity {
             append(getString(R.string.monitor_capture_exit_code,exitCode));
         }
         append(getString(R.string.monitor_capture_stopped_from_notification));
-        restoreInterface(restoreFromStore());
     }
 
     private boolean isUsableCapture(File file){
@@ -730,18 +789,22 @@ public final class MonitorModeActivity extends BaseActivity {
      * stop button takes over; both flip back together when the capture ends.</p>
      */
     private void applyRunningState(){
-        if(ifaceSpinner!=null) ifaceSpinner.setEnabled(!running && !probing);
-        if(channelSpinner!=null) channelSpinner.setEnabled(!running && !probing);
+        boolean restoringNow=RESTORING.get();
+        if(ifaceSpinner!=null) ifaceSpinner.setEnabled(!running && !probing && !restoringNow);
+        if(channelSpinner!=null) channelSpinner.setEnabled(!running && !probing && !restoringNow);
         if(startButton!=null){
-            startButton.setEnabled(!running && rootGranted
+            // The start button stays locked while the restore thread is
+            // running: a fresh start script racing the restore script would
+            // delete the just-created monitor interface (or re-enable Wi-Fi).
+            startButton.setEnabled(!running && !restoringNow && rootGranted
                     && !channels.isEmpty() && !interfaces.isEmpty());
             startButton.setText(getString(running?R.string.monitor_start_running:R.string.monitor_start));
         }
         if(stopButton!=null){
-            stopButton.setEnabled(running);
+            stopButton.setEnabled(running || restoringNow);
             stopButton.setText(getString(R.string.monitor_stop_restore));
         }
-        if(refreshButton!=null) refreshButton.setEnabled(!running && !probing);
+        if(refreshButton!=null) refreshButton.setEnabled(!running && !probing && !restoringNow);
         updateHopToggle();
     }
 

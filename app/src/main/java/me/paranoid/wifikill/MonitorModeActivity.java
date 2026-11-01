@@ -781,6 +781,31 @@ public final class MonitorModeActivity extends BaseActivity {
     }
 
     /**
+     * One-tap pure analysis of the current (or last) capture: it reports which
+     * handshakes were actually captured, so the user knows whether the file is
+     * worth sending to aircrack-ng — no root call involved.
+     *
+     * <p>The buildUi() button has referenced this method since the handshake
+     * check was introduced, but the method itself was never committed, which
+     * is what broke the previous CI builds at compile time.</p>
+     */
+    private void checkHandshake(){
+        if(running){toast(getString(R.string.monitor_stop_before_export));return;}
+        final File capture=latestCaptureFile;
+        if(!isUsableCapture(capture)){toast(getString(R.string.monitor_no_capture));return;}
+        handshakeButton.setEnabled(false);
+        append(getString(R.string.monitor_log_check_running));
+        new Thread(()->{
+            // Parsing reads the whole PCAP from flash; keep it off the UI thread.
+            final String summary=CaptureReport.summarize(this,capture);
+            runOnUiThread(()->{
+                append(summary);
+                handshakeButton.setEnabled(true);
+            });
+        },"wifitester-handshake-check").start();
+    }
+
+    /**
      * Keeps the interface/channel pickers aligned with the live capture.
      *
      * <p>While a capture runs the driver is already tuned to the channel that

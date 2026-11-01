@@ -418,6 +418,7 @@
     <string name="monitor_export_report">导出完整诊断报告</string>
     <string name="monitor_export_capture">导出最近的 PCAP 抓包</string>
     <string name="monitor_check_handshake">检测握手包</string>
+    <string name="monitor_log_check_running">正在解析最近的抓包文件……</string>
     <string name="monitor_log_title">诊断日志 / 抓包输出</string>
     <string name="monitor_log_waiting">等待设备检测…</string>
     <string name="monitor_stop_first">请先停止监听，再重新检测</string>

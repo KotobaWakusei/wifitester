@@ -415,6 +415,7 @@
     <string name="monitor_export_report">Export the full diagnostic report</string>
     <string name="monitor_export_capture">Export the latest PCAP capture</string>
     <string name="monitor_check_handshake">Check handshake</string>
+    <string name="monitor_log_check_running">Parsing the latest capture file...</string>
     <string name="monitor_log_title">Diagnostic log / capture output</string>
     <string name="monitor_log_waiting">Waiting for the device probe…</string>
     <string name="monitor_stop_first">Stop the monitoring session before probing again</string>

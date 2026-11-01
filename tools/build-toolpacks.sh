@@ -305,6 +305,7 @@ build_hostapd() {
   # "utils/includes.h file not found". EXTRA_CFLAGS/LDFLAGS are meant to append.
   # Link against the static libnl built above.
   local -a MAKE_ARGS=(CC="$CC" AR="$AR" RANLIB="$RANLIB"
+    ALL=hostapd
     EXTRA_CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include -I../src/utils -I$PREFIX/include/libnl3"
     LIBS="-L$PREFIX/lib -lnl-genl-3 -lnl-3 -L$PREFIX/openssl/lib -lssl -lcrypto -lc -ldl"
     LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static")

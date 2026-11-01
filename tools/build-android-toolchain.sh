@@ -411,7 +411,11 @@ build_hostapd() {
   # hostapd 2.11 builds out-of-tree: objects and the binary land in
   # ../build/<proj>/, so "make" can succeed without leaving ./hostapd.
   # V=1 keeps every command in the CI log for diagnosis.
-  make -j"$(nproc)" V=1 CC="$CC" AR="$AR" RANLIB="$RANLIB" \
+  # ALL=hostapd skips hostapd_cli: its Makefile appends -lrt, which does
+  # not exist in bionic (the APIs live in libc), and the app only needs the
+  # daemon. hostapd 2.11 builds out-of-tree into ../build/<proj>/, so
+  # locate the binary there (or in the source dir) before installing.
+  make -j"$(nproc)" V=1 ALL=hostapd CC="$CC" AR="$AR" RANLIB="$RANLIB" \
     EXTRA_CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include -I../src/utils -I$PREFIX/include/libnl3 -D__ANDROID_API__=23" \
     LIBS="-L$PREFIX/lib -lnl-genl-3 -lnl-3 -L$PREFIX/openssl/lib -lssl -lcrypto -lc -ldl" \
     EXTRA_LDFLAGS="-L$PREFIX/lib -L$PREFIX/openssl/lib" || return 1

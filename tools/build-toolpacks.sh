@@ -217,7 +217,10 @@ build_aircrack() {
     fi
     ./autogen.sh >/dev/null 2>&1 || { warn "aircrack-ng: autogen.sh failed"; return 1; }
   fi
-  CC="$CC" LD="$LD" AR="$AR" RANLIB="$RANLIB" \
+  # The final link runs through CXXLD ($(CXX)); leaving CXX unset made
+  # configure fall back to the host g++, whose linker then rejected the
+  # arm64 objects ("Relocations in generic ELF (EM: 183)").
+  CC="$CC" CXX="$TOOLCHAIN/bin/${TARGET}${API}-clang++" LD="$LD" AR="$AR" RANLIB="$RANLIB" \
     CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include -I$PREFIX/include -D_GNU_SOURCE -DCODESET=0 -Dnl_langinfo(x)=\"UTF-8\" -DDISABLE_TUI=1" \
     LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static" \
     LIBS="-ldl" \
@@ -251,12 +254,12 @@ build_libnl() {
   # The tag snapshot has no generated configure script.
   [[ -f ./configure ]] || autoreconf -fi >/dev/null 2>&1 || return 1
   # libnl's configure probe fails against the NDK ("libpthread is required"):
-  # bionic ships pthread inside libc. Bypass the probe with the autoconf
-  # cache answer; -static is dropped because it only affects libnl's own
-  # test binaries, not the static archive hostapd links against.
+  # bionic ships pthread inside libc, so AC_CHECK_LIB([pthread]) can't find a
+  # separate libpthread. Bypass with the exact autoconf cache variable the
+  # check uses (AC_CHECK_LIB([pthread], [pthread_mutex_lock])).
   CC="$CC" LD="$LD" AR="$AR" RANLIB="$RANLIB" \
     CFLAGS="-O2 -fPIC -D_GNU_SOURCE" \
-    ac_cv_lib_pthread_pthread_create=yes \
+    ac_cv_lib_pthread_pthread_mutex_lock=yes \
     ./configure --host="$TARGET" --prefix="$PREFIX" \
       --disable-shared --enable-static --disable-cli --disable-debug \
       >/dev/null || return 1
@@ -320,12 +323,17 @@ build_reaver() {
   tar -xf "$WORK/reaver.tar.xz" -C "$WORK/reav" --strip-components=1 || return 1
   cd "$WORK/reav" || return 1
   if [[ ! -x ./configure ]]; then
-    # Fail loudly: a silenced bootstrap/autoreconf leaves no clue at all.
+    warn "reaver: no configure in the tarball; running autoreconf"
     if ! command -v autoreconf >/dev/null 2>&1; then
       warn "reaver: no configure script and autotools are missing"
       return 1
     fi
-    ./bootstrap >/dev/null 2>&1 || { warn "reaver: bootstrap failed"; ./bootstrap || return 1; }
+    if ! autoreconf -fi >/dev/null 2>&1; then
+      # Fail loudly with the tarball layout and the real autoreconf error.
+      warn "reaver: autoreconf failed; directory contents:"
+      ls -la . | head -n 20
+      autoreconf -fi || return 1
+    fi
   fi
   # reaver needs OpenSSL and libpcap. Ensure they are built first.
   [[ -f "$PREFIX/lib/libpcap.a" ]] || build_libpcap || return 1

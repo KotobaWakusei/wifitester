@@ -225,7 +225,7 @@ build_aircrack() {
     LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static" \
     LIBS="-ldl" \
     PKG_CONFIG_PATH="$PREFIX/openssl/lib/pkgconfig" \
-    ./configure --host="$TARGET" --prefix="$PREFIX" \
+    ./configure --host="$TARGET" --prefix="$PREFIX" --sbindir="$PREFIX/bin" \
       --without-libnl --without-udev --disable-etc --disable-gcrypt --disable-tui \
       --enable-static --disable-shared >/dev/null || return 1
   # configure embeds CFLAGS verbatim into the Makefile, and the recipe shell
@@ -257,13 +257,20 @@ build_libnl() {
   # bionic ships pthread inside libc, so AC_CHECK_LIB([pthread]) can't find a
   # separate libpthread. Bypass with the exact autoconf cache variable the
   # check uses (AC_CHECK_LIB([pthread], [pthread_mutex_lock])).
+  # Modern bionic does not declare in_addr_t anywhere in the include chain
+  # (arpa/inet.h uses it without a provider), so alias it explicitly.
   CC="$CC" LD="$LD" AR="$AR" RANLIB="$RANLIB" \
-    CFLAGS="-O2 -fPIC -D_GNU_SOURCE" \
+    CFLAGS="-O2 -fPIC -D_GNU_SOURCE -Din_addr_t=uint32_t" \
     ac_cv_lib_pthread_pthread_mutex_lock=yes \
     ./configure --host="$TARGET" --prefix="$PREFIX" \
       --disable-shared --enable-static --disable-cli --disable-debug \
       >/dev/null || return 1
-  make -j"$(nproc)" >/dev/null || return 1
+  # Keep the compile command and first errors visible on failure.
+  if ! make -j"$(nproc)" >/dev/null 2>&1; then
+    make -j1 > "$WORK/libnl-make.log" 2>&1 || true
+    head -n 60 "$WORK/libnl-make.log"
+    return 1
+  fi
   make install >/dev/null || return 1
 }
 
@@ -314,9 +321,12 @@ build_reaver() {
   # The GitHub tag snapshots ship no generated configure script, so the
   # pregenerated tarballs from the project site are preferred. Upstream
   # publishes the release asset as .tar.xz (the old .tar.gz URL 404s).
-  download "$WORK/reaver.tar.xz" \
-    "https://github.com/t6x/reaver-wps-fork-t6x/releases/download/v${REAVER_VERSION}/reaver-${REAVER_VERSION}.tar.xz" \
-    "https://github.com/t6x/reaver-wps-fork-t6x/archive/refs/tags/v${REAVER_VERSION}.tar.gz" || return 1
+  # The release .tar.xz ships only src/docs/tools without any autotools
+  # files, so the git tag snapshot (configure.ac + bootstrap) is the real
+  # build source; the release asset stays as a download fallback.
+  download "$WORK/reaver.tar.gz" \
+    "https://github.com/t6x/reaver-wps-fork-t6x/archive/refs/tags/v${REAVER_VERSION}.tar.gz" \
+    "https://github.com/t6x/reaver-wps-fork-t6x/releases/download/v${REAVER_VERSION}/reaver-${REAVER_VERSION}.tar.xz" || return 1
   rm -rf "$WORK/reav"
   mkdir -p "$WORK/reav"
   # GNU tar auto-detects gzip and xz, so one call handles both fallbacks.

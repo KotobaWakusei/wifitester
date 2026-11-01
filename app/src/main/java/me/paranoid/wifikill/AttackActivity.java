@@ -401,7 +401,12 @@ public final class AttackActivity extends BaseActivity {
                     : new RootShell.Result(-1, "");
             toolPaths.clear();
             for (ToolCatalog.Tool tool : ToolCatalog.parse(probe.output)) {
-                toolPaths.put(tool.name, tool.path);
+                // ConcurrentHashMap rejects null values; a missing tool is
+                // represented by get() returning null, which is exactly what
+                // every reader (describeTools/isToolAvailable) checks for.
+                if (tool.path != null) {
+                    toolPaths.put(tool.name, tool.path);
+                }
             }
             // The monitor interface is a device state, not a tool: it has to be
             // queried separately with "iw dev".

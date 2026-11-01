@@ -35,6 +35,9 @@ fi
 HOST_TAG="linux-x86_64"
 TOOLCHAIN="$NDK/toolchains/llvm/prebuilt/$HOST_TAG"
 CC="$TOOLCHAIN/bin/aarch64-linux-android23-clang"
+# configure's AC_PROG_LD otherwise picks the HOST linker, which rejects the
+# arm64 objects at final link ("Relocations in generic ELF (EM: 183)").
+LD="$TOOLCHAIN/bin/ld"
 CXX="$TOOLCHAIN/bin/aarch64-linux-android23-clang++"
 AR="$TOOLCHAIN/bin/llvm-ar"
 RANLIB="$TOOLCHAIN/bin/llvm-ranlib"
@@ -342,6 +345,38 @@ PYEOF
 }
 
 # --------------------------------------------------------------------------
+# libnl (static): the only nl80211 access library upstream hostapd accepts,
+# and the NDK ships nothing like it.
+# --------------------------------------------------------------------------
+build_libnl() {
+  log "libnl"
+  download "$WORK/libnl.tar.gz" \
+    "https://github.com/thom311/libnl/releases/download/libnl3_11_0/libnl-3.11.0.tar.gz" \
+    "https://github.com/thom311/libnl/archive/refs/tags/libnl3_11_0.tar.gz" || return 1
+  mkdir -p "$WORK/libnl"
+  tar -xzf "$WORK/libnl.tar.gz" -C "$WORK/libnl" --strip-components=1 || return 1
+  cd "$WORK/libnl" || return 1
+  # The tag snapshot has no generated configure script.
+  [[ -f ./configure ]] || autoreconf -fi >/dev/null 2>&1 || return 1
+  # Bionic ships pthread inside libc, so the libpthread probe fails; bypass
+  # it with the exact autoconf cache variable the check uses. Modern bionic
+  # also stopped declaring in_addr_t anywhere in the include chain while
+  # arpa/inet.h still uses it, hence the alias.
+  CC="$CC" LD="$LD" AR="$AR" RANLIB="$RANLIB" \
+    CFLAGS="-O2 -fPIC -D_GNU_SOURCE -Din_addr_t=uint32_t" \
+    ac_cv_lib_pthread_pthread_mutex_lock=yes \
+    ./configure --host=aarch64-linux-android23 --prefix="$PREFIX" \
+      --disable-shared --enable-static --disable-cli --disable-debug \
+      >/dev/null || return 1
+  if ! make -j"$(nproc)" >/dev/null 2>&1; then
+    make -j1 > "$WORK/libnl-make.log" 2>&1 || true
+    head -n 60 "$WORK/libnl-make.log"
+    return 1
+  fi
+  make install >/dev/null || return 1
+}
+
+# --------------------------------------------------------------------------
 # hostapd (rogue access point)
 # --------------------------------------------------------------------------
 build_hostapd() {
@@ -359,16 +394,25 @@ build_hostapd() {
     [[ -f defconfig ]] || fatal "hostapd: defconfig missing in $(pwd)"
     cp defconfig .config || return 1
   fi
-  if ! grep -q '^CONFIG_DRIVER_NL80211=y$' .config; then
-    echo 'CONFIG_DRIVER_NL80211=y' >> .config
-  fi
+  # hostapd's Makefile uses "ifdef CONFIG_*", so a duplicate "=y" line still
+  # counts; strip every existing definition of the ones we append.
+  grep -vE '^CONFIG_(LIBNL32|LIBNL|LIBNL3|LIBNL_ROUTE3|LIBNL3_ROUTE|DRIVER_NL80211|DRIVER_HOSTAP|IEEE8021X_EAPOL)=' \
+    .config > .config.new && mv .config.new .config
+  {
+    echo 'CONFIG_DRIVER_NL80211=y'
+    echo 'CONFIG_IEEE8021X_EAPOL=y'
+  } >> .config
+  [[ -f "$PREFIX/lib/libnl-3.a" ]] || build_libnl || return 1
   # Do not pass CFLAGS/LDFLAGS on make's command line: GNU make then
   # suppresses hostapd's own include flags (notably -I../src), causing
   # utils/includes.h failures. hostapd supports EXTRA_CFLAGS/EXTRA_LDFLAGS.
+  # Keep bionic dynamic (like tcpdump): only libnl and OpenSSL come from
+  # static archives, so lld emits a TLS segment the device accepts.
   make -j"$(nproc)" CC="$CC" AR="$AR" RANLIB="$RANLIB" \
-    EXTRA_CFLAGS="-I$PREFIX/openssl/include -D__ANDROID_API__=23" \
-    EXTRA_LDFLAGS="-L$PREFIX/openssl/lib" \
-    CONFIG_LIBNL=n CONFIG_IEEE8021AX=n CONFIG_DRIVER_NL80211=y || return 1
+    EXTRA_CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include -I../src/utils -I$PREFIX/include/libnl3 -D__ANDROID_API__=23" \
+    LIBS="-L$PREFIX/lib -lnl-genl-3 -lnl-3 -L$PREFIX/openssl/lib -lssl -lcrypto -lc -ldl" \
+    EXTRA_LDFLAGS="-L$PREFIX/lib -L$PREFIX/openssl/lib" \
+    CONFIG_DRIVER_NL80211=y || return 1
   install -m 0755 hostapd "$ASSETS/hostapd" || return 1
   "$STRIP" "$ASSETS/hostapd"
 }
@@ -417,10 +461,10 @@ run_step "tcpdump" build_tcpdump || true
 # The remaining tools depend on the crypto backend.
 if run_step "openssl" build_openssl; then
   run_step "aircrack-ng" build_aircrack || true
-  # hostapd's nl80211 backend needs a separately cross-compiled libnl.
-  # Do not fail the entire APK build on the currently unsupported hostapd
-  # dependency; keep it absent rather than shipping a broken executable.
-  warn "skipping hostapd: Android libnl cross-build is not configured yet"
+  # hostapd's nl80211 backend needs the statically cross-compiled libnl
+  # produced by build_libnl(); a failure here skips hostapd alone instead
+  # of failing the whole APK build.
+  run_step "hostapd" build_hostapd || true
 else
   warn "skipping aircrack-ng and hostapd: no crypto backend"
 fi

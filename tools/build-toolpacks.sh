@@ -306,7 +306,7 @@ build_hostapd() {
   # Link against the static libnl built above.
   local -a MAKE_ARGS=(CC="$CC" AR="$AR" RANLIB="$RANLIB"
     EXTRA_CFLAGS="-O2 -fPIC -I$PREFIX/openssl/include -I../src/utils -I$PREFIX/include/libnl3"
-    LIBS="-L$PREFIX/lib -lnl-genl-3 -lnl-3 -lc -ldl"
+    LIBS="-L$PREFIX/lib -lnl-genl-3 -lnl-3 -L$PREFIX/openssl/lib -lssl -lcrypto -lc -ldl"
     LDFLAGS="-L$PREFIX/openssl/lib -L$PREFIX/lib -static")
   # The first attempt is silenced to keep the log short; a failure reruns
   # loudly so the CI log shows the real compiler error instead of a bare
@@ -330,7 +330,7 @@ build_reaver() {
   rm -rf "$WORK/reav"
   mkdir -p "$WORK/reav"
   # GNU tar auto-detects gzip and xz, so one call handles both fallbacks.
-  tar -xf "$WORK/reaver.tar.xz" -C "$WORK/reav" --strip-components=1 || return 1
+  tar -xf "$WORK/reaver.tar.gz" -C "$WORK/reav" --strip-components=1 || return 1
   cd "$WORK/reav" || return 1
   if [[ ! -x ./configure ]]; then
     warn "reaver: no configure in the tarball; running autoreconf"

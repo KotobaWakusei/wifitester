@@ -87,6 +87,34 @@
             android:parentActivityName="me.paranoid.wifikill.MainActivity" />
 
         <activity
+            android:name="me.paranoid.wifikill.WordlistActivity"
+            android:exported="false"
+            android:label="@string/wordlist_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
+
+        <activity
+            android:name="me.paranoid.wifikill.DiagnosisActivity"
+            android:exported="false"
+            android:label="@string/diag_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
+
+        <activity
+            android:name="me.paranoid.wifikill.ChannelAnalysisActivity"
+            android:exported="false"
+            android:label="@string/channel_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
+
+        <activity
+            android:name="me.paranoid.wifikill.CaptureManagerActivity"
+            android:exported="false"
+            android:label="@string/capture_title"
+            android:theme="@style/MonitorTheme"
+            android:parentActivityName="me.paranoid.wifikill.MainActivity" />
+
+        <activity
             android:name="me.paranoid.wifikill.AircrackNgActivity"
             android:exported="false"
             android:label="@string/inventory_title"
@@ -105,6 +133,17 @@
                 android:name="autoStoreLocales"
                 android:value="true" />
         </service>
+
+        <!-- Shares capture files and wordlists with other apps (read-only). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- First-launch disclaimer and tool package selection. -->
         <activity

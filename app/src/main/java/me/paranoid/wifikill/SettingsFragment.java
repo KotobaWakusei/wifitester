@@ -653,7 +653,93 @@ public final class SettingsFragment extends Fragment {
             }
         });
         card.addView(repository, LightKit.top(getActivity(), 10));
+
+        MaterialButton checkUpdate = LightKit.secondary(getActivity(),
+                getString(R.string.update_check));
+        checkUpdate.setOnClickListener(v -> runUpdateCheck(checkUpdate));
+        card.addView(checkUpdate, LightKit.top(getActivity(), 8));
         return card;
+    }
+
+    /**
+     * Queries the GitHub releases API in the background and offers the APK
+     * download through the system DownloadManager when a newer release
+     * exists. Never bypasses anything: the user still installs the APK.
+     */
+    private void runUpdateCheck(MaterialButton button) {
+        final Activity activity = getActivity();
+        if (activity == null) {
+            return;
+        }
+        button.setEnabled(false);
+        button.setText(getString(R.string.update_checking));
+        final android.content.Context appContext = activity.getApplicationContext();
+        new Thread(() -> {
+            UpdateChecker.Release release = null;
+            String error = null;
+            try {
+                release = UpdateChecker.fetchLatest();
+            } catch (Exception failure) {
+                error = failure.getClass().getSimpleName() + ": " + failure.getMessage();
+            }
+            final UpdateChecker.Release latest = release;
+            final String failureText = error;
+            activity.runOnUiThread(() -> {
+                button.setEnabled(true);
+                button.setText(getString(R.string.update_check));
+                if (latest == null) {
+                    MainActivity.notify(activity, getString(R.string.update_check_failed, failureText));
+                    return;
+                }
+                if (!UpdateChecker.isNewer(BuildConfig.VERSION_NAME, latest.tag)) {
+                    MainActivity.notify(activity, getString(R.string.update_latest, latest.tag));
+                    return;
+                }
+                showUpdateDialog(activity, latest);
+            });
+        }, "wifitester-update-check").start();
+    }
+
+    private void showUpdateDialog(Activity activity, UpdateChecker.Release latest) {
+        String notes = latest.notes == null ? "" : latest.notes;
+        if (notes.length() > 900) {
+            notes = notes.substring(0, 900) + "…";
+        }
+        String message = getString(R.string.update_available_body, latest.tag)
+                + (notes.isEmpty() ? "" : "\n\n" + notes);
+        new com.google.android.material.dialog.MaterialAlertDialogBuilder(host())
+                .setTitle(getString(R.string.update_available_title))
+                .setMessage(message)
+                .setPositiveButton(getString(R.string.update_download), (dialog, which) ->
+                        enqueueDownload(activity, latest))
+                .setNegativeButton(getString(R.string.action_cancel), null)
+                .show();
+    }
+
+    private void enqueueDownload(Activity activity, UpdateChecker.Release latest) {
+        try {
+            android.app.DownloadManager.Request request =
+                    new android.app.DownloadManager.Request(android.net.Uri.parse(latest.apkUrl));
+            request.setTitle(getString(R.string.update_download_title, latest.tag));
+            request.setDescription(getString(R.string.update_download_description));
+            request.setNotificationVisibility(
+                    android.app.DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+            String name = latest.apkName.isEmpty()
+                    ? "wifitester-" + latest.tag + ".apk" : latest.apkName;
+            request.setDestinationInExternalPublicDir(android.os.Environment.DIRECTORY_DOWNLOADS, name);
+            request.allowScanningByMediaScanner();
+            android.app.DownloadManager manager = (android.app.DownloadManager)
+                    activity.getSystemService(android.content.Context.DOWNLOAD_SERVICE);
+            if (manager == null) {
+                MainActivity.notify(activity, getString(R.string.update_download_failed, "DownloadManager"));
+                return;
+            }
+            manager.enqueue(request);
+            MainActivity.notify(activity, getString(R.string.update_download_started, name));
+        } catch (Exception failure) {
+            MainActivity.notify(activity, getString(R.string.update_download_failed,
+                    failure.getClass().getSimpleName() + ": " + failure.getMessage()));
+        }
     }
 
     // ---- small contracts --------------------------------------------------

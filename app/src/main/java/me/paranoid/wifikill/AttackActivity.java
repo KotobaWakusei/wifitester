@@ -57,6 +57,11 @@ public final class AttackActivity extends BaseActivity {
     private static final String CAPTURE_DIRECTORY = "attack-captures";
     private static final String MONITOR_INTERFACE = "wfkmon0";
     private String monitorInterface = MONITOR_INTERFACE;
+    /** Request codes for the wordlist manager and the capture manager. */
+    private static final int REQ_WORDLIST_MANAGER = 8201;
+    private static final int REQ_CAPTURE_MANAGER = 8202;
+    /** Capture explicitly chosen in the capture manager for the crack module. */
+    private String selectedCapturePath;
 
     private TextView statusState;
     private TextView toolState;
@@ -341,6 +346,14 @@ public final class AttackActivity extends BaseActivity {
         wordlistPickButton = pick;
         pick.setOnClickListener(v -> wordlistInput.setText(SettingsStore.wordlistPath(this)));
         card.addView(pick, top(8));
+        MaterialButton manageWordlists = tonalButton(getString(R.string.attack_manage_wordlists));
+        manageWordlists.setOnClickListener(v -> startActivityForResult(
+                new Intent(this, WordlistActivity.class), REQ_WORDLIST_MANAGER));
+        card.addView(manageWordlists, top(8));
+        MaterialButton manageCaptures = tonalButton(getString(R.string.attack_manage_captures));
+        manageCaptures.setOnClickListener(v -> startActivityForResult(
+                new Intent(this, CaptureManagerActivity.class), REQ_CAPTURE_MANAGER));
+        card.addView(manageCaptures, top(8));
         return card;
     }
 
@@ -732,6 +745,13 @@ public final class AttackActivity extends BaseActivity {
                         bssid, channel, prefix);
             }
             case AttackCatalog.ID_CRACK: {
+                // A capture picked in the capture manager wins over the
+                // "newest .cap" heuristic.
+                if (selectedCapturePath != null
+                        && new File(selectedCapturePath).isFile()) {
+                    return AttackCommandBuilder.crackHandshake("aircrack-ng",
+                            selectedCapturePath, wordlist);
+                }
                 File directory = new File(getFilesDir(), CAPTURE_DIRECTORY);
                 File[] files = directory.listFiles();
                 String capture = null;
@@ -1332,6 +1352,26 @@ public final class AttackActivity extends BaseActivity {
         // preference is off; applyKeepScreenOn() would have cleared it.
         if (managed != null) {
             getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_WORDLIST_MANAGER
+                && resultCode == WordlistActivity.RESULT_SELECTED && data != null) {
+            String path = data.getStringExtra(WordlistActivity.EXTRA_SELECTED_PATH);
+            if (path != null && wordlistInput != null) {
+                wordlistInput.setText(path);
+                append(getString(R.string.attack_wordlist_selected, path));
+            }
+        } else if (requestCode == REQ_CAPTURE_MANAGER
+                && resultCode == CaptureManagerActivity.RESULT_CAPTURE_SELECTED
+                && data != null) {
+            selectedCapturePath = data.getStringExtra(CaptureManagerActivity.EXTRA_CAPTURE_PATH);
+            if (selectedCapturePath != null) {
+                append(getString(R.string.attack_capture_selected, selectedCapturePath));
+            }
         }
     }
 

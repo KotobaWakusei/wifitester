@@ -117,6 +117,14 @@
     <string name="tools_audit_detail">Tabulate SSID, BSSID, signal strength, frequency, channel and security capabilities.</string>
     <string name="tools_inventory">Toolchain inventory</string>
     <string name="tools_inventory_detail">Check whether aircrack-ng, airodump-ng, aireplay-ng, airmon-ng, tcpdump, iw, ip, capinfos, tshark, hostapd and arpspoof are available and where they come from.</string>
+    <string name="tools_diag">Network diagnosis</string>
+    <string name="tools_diag_detail">One-tap check-up: signal, gateway latency, DNS, internet reachability and packet loss, with a plain-language verdict.</string>
+    <string name="tools_channel">Channel congestion</string>
+    <string name="tools_channel_detail">Aggregate visible networks per channel and recommend the least occupied one.</string>
+    <string name="tools_captures">Capture manager</string>
+    <string name="tools_captures_detail">Inspect capture files and handshake state; share / delete / hand over to the password verification.</string>
+    <string name="tools_wordlist">Wordlist manager</string>
+    <string name="tools_wordlist_detail">Import / download / pick the dictionary used by the offline password verification.</string>
     <string name="tools_attack">Attack workbench</string>
     <string name="tools_attack_detail">Deauthentication flood, beacon flood, handshake capture and password verification, rogue access point, ARP spoofing. Only for networks you own or have written authorisation for.</string>
     <string name="tools_boundary_title">Boundaries</string>
@@ -768,4 +776,143 @@
     <string name="monitor_hop_not_supported">Channel hopping not supported on this interface</string>
     <string name="monitor_hop_already_running">Channel hopping already running</string>
     <string name="monitor_hop_not_running">Channel hopping not running</string>
+
+    <!-- Wordlist manager -->
+    <string name="wordlist_eyebrow">WIFITESTER / DICTIONARIES</string>
+    <string name="wordlist_title">Wordlist manager</string>
+    <string name="wordlist_subtitle">Manage the dictionary files used by the offline password verification.</string>
+    <string name="wordlist_default_title">Current default wordlist</string>
+    <string name="wordlist_default_value">%1$s</string>
+    <string name="wordlist_none">(not set)</string>
+    <string name="wordlist_add_title">Add a wordlist</string>
+    <string name="wordlist_import">Import from device storage</string>
+    <string name="wordlist_url_hint">or enter a download URL (http/https, 200 MB per-file limit):</string>
+    <string name="wordlist_download">Download</string>
+    <string name="wordlist_url_invalid">Enter a download URL starting with http(s)://</string>
+    <string name="wordlist_download_http">Server returned HTTP %1$d</string>
+    <string name="wordlist_download_too_large">The file exceeds the 200 MB limit</string>
+    <string name="wordlist_download_empty">The download was empty</string>
+    <string name="wordlist_download_done">Wordlist downloaded</string>
+    <string name="wordlist_download_failed">Download failed: %1$s</string>
+    <string name="wordlist_dir_failed">The wordlist directory could not be created</string>
+    <string name="wordlist_list_title">Saved wordlists</string>
+    <string name="wordlist_empty">No wordlists yet. Import a file or download one.</string>
+    <string name="wordlist_size">size %1$s</string>
+    <string name="wordlist_lines">%1$d lines</string>
+    <string name="wordlist_use">Set as default and use</string>
+    <string name="wordlist_share">Share</string>
+    <string name="wordlist_delete">Delete</string>
+    <string name="wordlist_delete_confirm">Delete "%1$s"? This cannot be undone.</string>
+    <string name="wordlist_delete_failed">Delete failed</string>
+    <string name="wordlist_selected">Wordlist selected: %1$s</string>
+    <string name="wordlist_import_done">Imported: %1$s</string>
+    <string name="wordlist_import_failed">Import failed: %1$s</string>
+    <string name="wordlist_open_failed">The selected file could not be opened</string>
+    <string name="wordlist_share_failed">Share failed: %1$s</string>
+
+    <!-- Network diagnosis -->
+    <string name="diag_eyebrow">WIFITESTER / DIAGNOSIS</string>
+    <string name="diag_title">Network diagnosis</string>
+    <string name="diag_subtitle">Walks through signal, gateway, DNS and internet reachability to find why a connection is slow or flaky. Read-only, no root required.</string>
+    <string name="diag_run">Start diagnosis</string>
+    <string name="diag_note">Takes about 15 seconds; sends a few probe packets to the gateway and public addresses.</string>
+    <string name="diag_results_title">Check results</string>
+    <string name="diag_share">Share report</string>
+    <string name="diag_share_subject">WiFiTester network diagnosis report</string>
+    <string name="diag_share_failed">The share sheet could not be opened</string>
+    <string name="diag_running">Diagnosis running…</string>
+    <string name="diag_done">Diagnosis finished, verdict:</string>
+    <string name="diag_conn">Connection and signal</string>
+    <string name="diag_conn_detail">SSID %1$s · signal %2$d dBm · link %3$d Mbps · %4$d MHz</string>
+    <string name="diag_disconnected">No Wi-Fi network is connected right now</string>
+    <string name="diag_unavailable">The Wi-Fi service is unavailable</string>
+    <string name="diag_gateway">Gateway %1$s</string>
+    <string name="diag_gateway_unknown">The gateway address could not be determined</string>
+    <string name="diag_ping_result">packet loss %1$d%% · average latency %2$s</string>
+    <string name="diag_no_reply">no reply</string>
+    <string name="diag_dns">DNS resolution</string>
+    <string name="diag_dns_failed">Every domain failed to resolve</string>
+    <string name="diag_dns_result">fastest %1$d ms · %2$d domain(s) failed</string>
+    <string name="diag_internet">Internet reachability</string>
+    <string name="diag_internet_failed">No probe address was reachable</string>
+    <string name="diag_internet_result">fastest %1$d ms</string>
+    <string name="diag_v_no_conn">No Wi-Fi connection</string>
+    <string name="diag_v_weak">Weak signal (%1$d dBm)</string>
+    <string name="diag_v_gateway_loss">Packet loss to the gateway (%1$d%%)</string>
+    <string name="diag_v_dns">DNS resolution failed or is slow</string>
+    <string name="diag_v_internet">The internet is unreachable</string>
+    <string name="diag_v_healthy">All checks passed: link, gateway, DNS and internet are healthy.</string>
+    <string name="diag_v_summary">Problems found:</string>
+    <string name="diag_s_connect">Connect to a Wi-Fi network first, then run the diagnosis again.</string>
+    <string name="diag_s_weak">Move closer to the router, avoid walls and microwave ovens, or switch to 5 GHz.</string>
+    <string name="diag_s_gateway">Reboot the router, or check whether many devices are using the bandwidth.</string>
+    <string name="diag_s_dns">Try different DNS servers (e.g. 223.5.5.5 / 119.29.29.29).</string>
+    <string name="diag_s_internet">Check the broadband modem; contact your ISP if it stays down.</string>
+    <string name="diag_report_title">WiFiTester network diagnosis report\ntime: </string>
+
+    <!-- Update check -->
+    <string name="update_check">Check for updates</string>
+    <string name="update_checking">Checking…</string>
+    <string name="update_check_failed">Update check failed: %1$s</string>
+    <string name="update_latest">Already on the latest version (%1$s)</string>
+    <string name="update_available_title">Update available</string>
+    <string name="update_available_body">Version %1$s has been released.</string>
+    <string name="update_download">Download update</string>
+    <string name="update_download_title">WiFiTester %1$s</string>
+    <string name="update_download_description">Downloading the update; tap the notification when it finishes to install.</string>
+    <string name="update_download_started">Downloading %1$s; install it from the notification when done.</string>
+    <string name="update_download_failed">Download failed: %1$s</string>
+
+    <!-- Channel analysis -->
+    <string name="channel_eyebrow">WIFITESTER / CHANNELS</string>
+    <string name="channel_title">Channel congestion</string>
+    <string name="channel_subtitle">Aggregates the visible networks per channel and recommends the least occupied one. 2.4 GHz counts the overlapping adjacent channels.</string>
+    <string name="channel_analyze">Scan and analyze</string>
+    <string name="channel_analyzing">Scanning and analyzing (about 4 s)…</string>
+    <string name="channel_wifi_missing">The Wi-Fi service is unavailable</string>
+    <string name="channel_wifi_off">Wi-Fi is off</string>
+    <string name="channel_scan_denied">The scan was denied by the system (check the location permission)</string>
+    <string name="channel_waiting">Tap the button above to start the analysis.</string>
+    <string name="channel_no_data">No scan results to analyze.</string>
+    <string name="channel_summary">Recommendation per band (lowest load):</string>
+    <string name="channel_best_line">%1$s GHz → channel %2$d (load %3$d)</string>
+    <string name="channel_table_title">Channel details</string>
+    <string name="channel_col_channel">Channel</string>
+    <string name="channel_col_aps">Networks</string>
+    <string name="channel_col_strong">Strong</string>
+    <string name="channel_col_load">Load</string>
+    <string name="channel_share">Share analysis</string>
+    <string name="channel_share_subject">WiFiTester channel congestion analysis</string>
+    <string name="channel_share_failed">The share sheet could not be opened</string>
+
+    <!-- Signal chart -->
+    <string name="signal_chart_title">Live signal chart</string>
+    <string name="signal_chart_start">Start recording</string>
+    <string name="signal_chart_stop">Stop</string>
+    <string name="signal_chart_idle">Not recording. Once started, the current connection\'s signal is sampled every second.</string>
+    <string name="signal_chart_latest">Current signal: %1$d dBm</string>
+    <string name="signal_chart_waiting">No samples yet</string>
+
+    <!-- Capture manager -->
+    <string name="capture_eyebrow">WIFITESTER / CAPTURES</string>
+    <string name="capture_title">Capture manager</string>
+    <string name="capture_subtitle">Inspect monitor captures and handshake captures, share them or hand them to the password verification. The handshake state comes from a local read-only analysis.</string>
+    <string name="capture_list_title">Capture files</string>
+    <string name="capture_empty">No capture files yet. They appear here after a monitor or handshake capture.</string>
+    <string name="capture_size">size %1$s</string>
+    <string name="capture_quality">%1$s · EAPOL frames %2$d · handshakes %3$d</string>
+    <string name="capture_format_unknown">Unrecognized file format</string>
+    <string name="capture_use_crack">Use for verification</string>
+    <string name="capture_share">Share</string>
+    <string name="capture_delete">Delete</string>
+    <string name="capture_delete_confirm">Delete "%1$s"? This cannot be undone.</string>
+    <string name="capture_delete_failed">Delete failed</string>
+    <string name="capture_selected">Capture selected: %1$s</string>
+    <string name="capture_share_failed">Share failed: %1$s</string>
+
+    <!-- Attack workbench additions -->
+    <string name="attack_manage_wordlists">Wordlist manager</string>
+    <string name="attack_manage_captures">Capture manager</string>
+    <string name="attack_wordlist_selected">Selected from the wordlist manager: %1$s</string>
+    <string name="attack_capture_selected">The verification will use the selected capture: %1$s</string>
 </resources>

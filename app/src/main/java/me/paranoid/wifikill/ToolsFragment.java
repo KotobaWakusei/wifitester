@@ -54,6 +54,18 @@ public final class ToolsFragment extends Fragment {
         addTool(root, "05", getString(R.string.tools_inventory),
                 getString(R.string.tools_inventory_detail),
                 getString(R.string.tools_inventory), () -> open(AircrackNgActivity.class), false);
+        addTool(root, "06", getString(R.string.tools_diag),
+                getString(R.string.tools_diag_detail),
+                getString(R.string.tools_diag), () -> open(DiagnosisActivity.class), false);
+        addTool(root, "07", getString(R.string.tools_channel),
+                getString(R.string.tools_channel_detail),
+                getString(R.string.tools_channel), () -> open(ChannelAnalysisActivity.class), false);
+        addTool(root, "08", getString(R.string.tools_captures),
+                getString(R.string.tools_captures_detail),
+                getString(R.string.tools_captures), () -> open(CaptureManagerActivity.class), false);
+        addTool(root, "09", getString(R.string.tools_wordlist),
+                getString(R.string.tools_wordlist_detail),
+                getString(R.string.tools_wordlist), () -> open(WordlistActivity.class), false);
 
         root.addView(section(getString(R.string.tools_active), getString(R.string.tools_active_detail)),
                 LightKit.bottom(getActivity(), 10));

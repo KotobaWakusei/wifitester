@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Files that may be shared through the FileProvider: the capture files the
+  app writes and the imported wordlists.
+-->
+<paths>
+    <files-path
+        name="captures"
+        path="captures/" />
+    <files-path
+        name="attack-captures"
+        path="attack-captures/" />
+    <files-path
+        name="wordlists"
+        path="wordlists/" />
+    <files-path
+        name="reports"
+        path="reports/" />
+</paths>

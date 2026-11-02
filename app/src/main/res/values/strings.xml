@@ -117,6 +117,14 @@
     <string name="tools_audit_detail">以表格形式查看 SSID、BSSID、信号强度、频率、频道与安全能力。</string>
     <string name="tools_inventory">工具链清单</string>
     <string name="tools_inventory_detail">检查 aircrack-ng、airodump-ng、aireplay-ng、airmon-ng、tcpdump、iw、ip、capinfos、tshark、hostapd、arpspoof 是否可用及其来源。</string>
+    <string name="tools_diag">网络诊断</string>
+    <string name="tools_diag_detail">一键体检：信号、网关延迟、DNS、外网连通与丢包，输出结论与建议。</string>
+    <string name="tools_channel">信道拥挤度</string>
+    <string name="tools_channel_detail">按信道聚合可见网络，推荐冲突最少的信道。</string>
+    <string name="tools_captures">抓包文件管理</string>
+    <string name="tools_captures_detail">查看捕获文件与握手状态，分享 / 删除 / 送入口令验证。</string>
+    <string name="tools_wordlist">词表管理</string>
+    <string name="tools_wordlist_detail">导入 / 下载 / 选择用于离线口令验证的字典文件。</string>
     <string name="tools_attack">攻击工作台</string>
     <string name="tools_attack_detail">断连洪水、信标洪水、握手捕获与口令验证、伪接入点、ARP 欺骗。仅限自有或已获书面授权的网络。</string>
     <string name="tools_boundary_title">使用边界</string>
@@ -768,4 +776,143 @@
     <string name="monitor_hop_not_supported">当前接口不支持信道跳频</string>
     <string name="monitor_hop_already_running">信道跳频已在运行</string>
     <string name="monitor_hop_not_running">信道跳频未运行</string>
+
+    <!-- Wordlist manager -->
+    <string name="wordlist_eyebrow">WIFITESTER / 字典</string>
+    <string name="wordlist_title">词表管理</string>
+    <string name="wordlist_subtitle">管理离线口令验证使用的字典文件。</string>
+    <string name="wordlist_default_title">当前默认词表</string>
+    <string name="wordlist_default_value">%1$s</string>
+    <string name="wordlist_none">（未设置）</string>
+    <string name="wordlist_add_title">添加词表</string>
+    <string name="wordlist_import">从设备存储导入</string>
+    <string name="wordlist_url_hint">或输入下载地址（http/https，单文件上限 200 MB）：</string>
+    <string name="wordlist_download">下载</string>
+    <string name="wordlist_url_invalid">请输入以 http(s):// 开头的下载地址</string>
+    <string name="wordlist_download_http">服务器返回 HTTP %1$d</string>
+    <string name="wordlist_download_too_large">文件超过 200 MB 上限</string>
+    <string name="wordlist_download_empty">下载内容为空</string>
+    <string name="wordlist_download_done">词表下载完成</string>
+    <string name="wordlist_download_failed">下载失败：%1$s</string>
+    <string name="wordlist_dir_failed">无法创建词表目录</string>
+    <string name="wordlist_list_title">已保存的词表</string>
+    <string name="wordlist_empty">还没有词表。导入一个文件或从网络下载。</string>
+    <string name="wordlist_size">大小 %1$s</string>
+    <string name="wordlist_lines">%1$d 行</string>
+    <string name="wordlist_use">设为默认并使用</string>
+    <string name="wordlist_share">分享</string>
+    <string name="wordlist_delete">删除</string>
+    <string name="wordlist_delete_confirm">确定删除 “%1$s”？此操作不可恢复。</string>
+    <string name="wordlist_delete_failed">删除失败</string>
+    <string name="wordlist_selected">已选择词表：%1$s</string>
+    <string name="wordlist_import_done">导入完成：%1$s</string>
+    <string name="wordlist_import_failed">导入失败：%1$s</string>
+    <string name="wordlist_open_failed">无法打开所选文件</string>
+    <string name="wordlist_share_failed">分享失败：%1$s</string>
+
+    <!-- Network diagnosis -->
+    <string name="diag_eyebrow">WIFITESTER / 诊断</string>
+    <string name="diag_title">网络诊断</string>
+    <string name="diag_subtitle">逐步检查信号、网关、DNS 与外网，定位连接慢或不稳的原因。全程只读，无需 Root。</string>
+    <string name="diag_run">开始诊断</string>
+    <string name="diag_note">诊断约需 15 秒；会向网关与公网地址发送少量探测包。</string>
+    <string name="diag_results_title">检查结果</string>
+    <string name="diag_share">分享报告</string>
+    <string name="diag_share_subject">WiFiTester 网络诊断报告</string>
+    <string name="diag_share_failed">无法打开分享面板</string>
+    <string name="diag_running">诊断进行中…</string>
+    <string name="diag_done">诊断完成，结论：</string>
+    <string name="diag_conn">连接与信号</string>
+    <string name="diag_conn_detail">SSID %1$s · 信号 %2$d dBm · 链路 %3$d Mbps · %4$d MHz</string>
+    <string name="diag_disconnected">当前未连接任何 Wi-Fi 网络</string>
+    <string name="diag_unavailable">Wi-Fi 服务不可用</string>
+    <string name="diag_gateway">网关 %1$s</string>
+    <string name="diag_gateway_unknown">无法确定网关地址</string>
+    <string name="diag_ping_result">丢包 %1$d%% · 平均延迟 %2$s</string>
+    <string name="diag_no_reply">无回应</string>
+    <string name="diag_dns">DNS 解析</string>
+    <string name="diag_dns_failed">所有域名都解析失败</string>
+    <string name="diag_dns_result">最快 %1$d ms · %2$d 个域名解析失败</string>
+    <string name="diag_internet">外网连通</string>
+    <string name="diag_internet_failed">所有探测地址都不可达</string>
+    <string name="diag_internet_result">最快 %1$d ms</string>
+    <string name="diag_v_no_conn">未连接 Wi-Fi</string>
+    <string name="diag_v_weak">信号偏弱（%1$d dBm）</string>
+    <string name="diag_v_gateway_loss">到网关有丢包（%1$d%%）</string>
+    <string name="diag_v_dns">DNS 解析失败或过慢</string>
+    <string name="diag_v_internet">外网不可达</string>
+    <string name="diag_v_healthy">各项检查正常：链路、网关、DNS 与外网均无异常。</string>
+    <string name="diag_v_summary">发现以下问题：</string>
+    <string name="diag_s_connect">先连接到 Wi-Fi 网络再运行诊断。</string>
+    <string name="diag_s_weak">靠近路由器、避开承重墙与微波炉等干扰源，或改用 5 GHz。</string>
+    <string name="diag_s_gateway">重启路由器，或检查是否有大量设备占用带宽。</string>
+    <string name="diag_s_dns">尝试更换 DNS（如 223.5.5.5 / 119.29.29.29）。</string>
+    <string name="diag_s_internet">检查宽带与光猫状态；如持续不通，联系运营商。</string>
+    <string name="diag_report_title">WiFiTester 网络诊断报告\n时间: </string>
+
+    <!-- Update check -->
+    <string name="update_check">检查更新</string>
+    <string name="update_checking">正在检查…</string>
+    <string name="update_check_failed">检查更新失败：%1$s</string>
+    <string name="update_latest">已是最新版本（%1$s）</string>
+    <string name="update_available_title">发现新版本</string>
+    <string name="update_available_body">新版本 %1$s 已发布。</string>
+    <string name="update_download">下载更新</string>
+    <string name="update_download_title">WiFiTester %1$s</string>
+    <string name="update_download_description">正在下载更新包，完成后在通知栏点按安装。</string>
+    <string name="update_download_started">已开始下载 %1$s，完成后请在通知栏安装。</string>
+    <string name="update_download_failed">下载失败：%1$s</string>
+
+    <!-- Channel analysis -->
+    <string name="channel_eyebrow">WIFITESTER / 信道</string>
+    <string name="channel_title">信道拥挤度</string>
+    <string name="channel_subtitle">按信道聚合可见网络并给出推荐。2.4 GHz 会计入相邻信道的重叠干扰。</string>
+    <string name="channel_analyze">扫描并分析</string>
+    <string name="channel_analyzing">正在扫描与分析（约 4 秒）…</string>
+    <string name="channel_wifi_missing">Wi-Fi 服务不可用</string>
+    <string name="channel_wifi_off">Wi-Fi 未开启</string>
+    <string name="channel_scan_denied">扫描被系统拒绝（请检查定位权限）</string>
+    <string name="channel_waiting">点击上方按钮开始分析。</string>
+    <string name="channel_no_data">没有可分析的扫描结果。</string>
+    <string name="channel_summary">各频段推荐（负载最低）：</string>
+    <string name="channel_best_line">%1$s GHz → 信道 %2$d（负载 %3$d）</string>
+    <string name="channel_table_title">信道明细</string>
+    <string name="channel_col_channel">信道</string>
+    <string name="channel_col_aps">网络数</string>
+    <string name="channel_col_strong">强信号</string>
+    <string name="channel_col_load">负载</string>
+    <string name="channel_share">分享分析</string>
+    <string name="channel_share_subject">WiFiTester 信道拥挤度分析</string>
+    <string name="channel_share_failed">无法打开分享面板</string>
+
+    <!-- Signal chart -->
+    <string name="signal_chart_title">信号实时曲线</string>
+    <string name="signal_chart_start">开始记录</string>
+    <string name="signal_chart_stop">停止</string>
+    <string name="signal_chart_idle">未在记录。开始后每秒记录一次当前连接的信号强度。</string>
+    <string name="signal_chart_latest">当前信号：%1$d dBm</string>
+    <string name="signal_chart_waiting">尚未记录数据</string>
+
+    <!-- Capture manager -->
+    <string name="capture_eyebrow">WIFITESTER / 抓包</string>
+    <string name="capture_title">抓包文件管理</string>
+    <string name="capture_subtitle">查看监听抓包与握手捕获，分享或送入口令验证。握手状态为本地只读分析。</string>
+    <string name="capture_list_title">捕获文件</string>
+    <string name="capture_empty">还没有捕获文件。监听抓包或握手捕获后会出现在这里。</string>
+    <string name="capture_size">大小 %1$s</string>
+    <string name="capture_quality">%1$s · EAPOL 帧 %2$d · 握手 %3$d 组</string>
+    <string name="capture_format_unknown">无法识别的文件格式</string>
+    <string name="capture_use_crack">送入口令验证</string>
+    <string name="capture_share">分享</string>
+    <string name="capture_delete">删除</string>
+    <string name="capture_delete_confirm">确定删除 “%1$s”？此操作不可恢复。</string>
+    <string name="capture_delete_failed">删除失败</string>
+    <string name="capture_selected">已选择捕获文件：%1$s</string>
+    <string name="capture_share_failed">分享失败：%1$s</string>
+
+    <!-- Attack workbench additions -->
+    <string name="attack_manage_wordlists">词表管理</string>
+    <string name="attack_manage_captures">捕获文件管理</string>
+    <string name="attack_wordlist_selected">已从词表管理选择：%1$s</string>
+    <string name="attack_capture_selected">破解将使用指定捕获文件：%1$s</string>
 </resources>

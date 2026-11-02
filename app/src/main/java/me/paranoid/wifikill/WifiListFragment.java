@@ -58,6 +58,27 @@ public final class WifiListFragment extends Fragment {
     private MaterialButton scanButton;
     /** Shown when the scan permission was denied with "don't ask again". */
     private MaterialButton permissionFixButton;
+    /** Live RSSI chart card (kept as fields for the sampler lifecycle). */
+    private SignalChartView signalChart;
+    private TextView signalStats;
+    private MaterialButton signalToggle;
+    private volatile boolean sampling;
+    private final android.os.Handler sampler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable sampleTask = new Runnable() {
+        @Override public void run() {
+            if (!sampling) return;
+            WifiManager manager = wifi;
+            if (manager != null) {
+                WifiInfo info = manager.getConnectionInfo();
+                int rssi = info == null ? -100 : info.getRssi();
+                if (signalChart != null) signalChart.submit(rssi);
+                if (signalStats != null) {
+                    signalStats.setText(getString(R.string.signal_chart_latest, rssi));
+                }
+            }
+            sampler.postDelayed(this, 1000L);
+        }
+    };
 
     private final List<NetworkEntry> entries = new ArrayList<>();
     private int sortMode = SORT_BY_SIGNAL;
@@ -198,6 +219,27 @@ public final class WifiListFragment extends Fragment {
         permissionFixButton.setOnClickListener(v -> openAppSettings());
         permissionFixButton.setVisibility(View.GONE);
         card.addView(permissionFixButton, LightKit.top(getActivity(), 8));
+
+        // ---- live signal chart ------------------------------------------------
+        LinearLayout chartCard = LightKit.card(getActivity());
+        LinearLayout chartHeading = new LinearLayout(getActivity());
+        chartHeading.setGravity(Gravity.CENTER_VERTICAL);
+        chartHeading.addView(LightKit.text(getActivity(), getString(R.string.signal_chart_title),
+                16, LightKit.INK, true), new LinearLayout.LayoutParams(0, -2, 1));
+        signalToggle = LightKit.secondary(getActivity(), getString(R.string.signal_chart_start));
+        signalToggle.setOnClickListener(v -> toggleSampling());
+        chartHeading.addView(signalToggle);
+        chartCard.addView(chartHeading);
+        signalChart = new SignalChartView(requireContext());
+        LinearLayout.LayoutParams chartParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LightKit.dp(getActivity(), 150));
+        chartParams.topMargin = LightKit.dp(getActivity(), 10);
+        signalChart.applyColors(LightKit.ACCENT, LightKit.INK);
+        chartCard.addView(signalChart, chartParams);
+        signalStats = LightKit.text(getActivity(), getString(R.string.signal_chart_idle),
+                12, LightKit.MUTED, false);
+        chartCard.addView(signalStats, LightKit.top(getActivity(), 6));
+        card.addView(chartCard, LightKit.top(getActivity(), 12));
 
         LinearLayout options = new LinearLayout(getActivity());
         options.setOrientation(LinearLayout.HORIZONTAL);
@@ -604,6 +646,34 @@ public final class WifiListFragment extends Fragment {
         }
     }
 
+    // ---- live signal chart ------------------------------------------------
+
+    private void toggleSampling() {
+        if (sampling) {
+            stopSampling();
+            return;
+        }
+        sampling = true;
+        if (signalToggle != null) {
+            signalToggle.setText(getString(R.string.signal_chart_stop));
+        }
+        if (signalChart != null) {
+            signalChart.clear();
+        }
+        sampler.post(sampleTask);
+    }
+
+    private void stopSampling() {
+        sampling = false;
+        sampler.removeCallbacks(sampleTask);
+        if (signalToggle != null) {
+            signalToggle.setText(getString(R.string.signal_chart_start));
+        }
+        if (signalStats != null) {
+            signalStats.setText(getString(R.string.signal_chart_idle));
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
         super.onRequestPermissionsResult(requestCode, permissions, results);
@@ -640,6 +710,7 @@ public final class WifiListFragment extends Fragment {
 
     @Override
     public void onPause() {
+        stopSampling();
         if (receiverRegistered) {
             try {
                 Context context = host();

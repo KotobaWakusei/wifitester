@@ -26,9 +26,12 @@
     <string name="wifi_scan_waiting">等待扫描。Android 可能限制扫描频率。</string>
     <string name="wifi_scan_requesting">正在请求系统扫描…</string>
     <string name="wifi_scan_found">发现 %1$d 个网络</string>
+    <string name="wifi_scan_found_zero">本次未发现网络。系统限制了扫描频率(约每 2 分钟 4 次)，稍候再点刷新；确认 Wi-Fi 已开启且附近有网络。</string>
     <string name="wifi_scan_denied">系统拒绝扫描。请授予附近网络权限并打开系统定位服务。</string>
     <string name="wifi_scan_failed">扫描失败：%1$s</string>
     <string name="wifi_scan_permission_missing">未授予附近网络扫描所需的位置权限。当前连接信息仍可查看。</string>
+    <string name="wifi_permission_denied_permanent">定位/附近设备权限已被拒绝且不再询问，扫描将始终为空。点击下方按钮到系统设置手动开启。</string>
+    <string name="wifi_permission_open_settings">去授权</string>
     <string name="wifi_sort_label">排序</string>
     <string name="wifi_sort_signal">信号</string>
     <string name="wifi_sort_channel">频道</string>

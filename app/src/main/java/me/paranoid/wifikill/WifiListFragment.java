@@ -56,6 +56,8 @@ public final class WifiListFragment extends Fragment {
     private TextView rootWarning;
     private TextView scanSummary;
     private MaterialButton scanButton;
+    /** Shown when the scan permission was denied with "don't ask again". */
+    private MaterialButton permissionFixButton;
 
     private final List<NetworkEntry> entries = new ArrayList<>();
     private int sortMode = SORT_BY_SIGNAL;
@@ -188,6 +190,15 @@ public final class WifiListFragment extends Fragment {
                 12, LightKit.MUTED, false);
         card.addView(scanSummary, LightKit.top(getActivity(), 6));
 
+        // Appears only when the scan permission was denied permanently: a
+        // fresh requestPermissions() call is then silently refused by the
+        // system, so the user has to grant it from the app settings.
+        permissionFixButton = LightKit.secondary(getActivity(),
+                getString(R.string.wifi_permission_open_settings));
+        permissionFixButton.setOnClickListener(v -> openAppSettings());
+        permissionFixButton.setVisibility(View.GONE);
+        card.addView(permissionFixButton, LightKit.top(getActivity(), 8));
+
         LinearLayout options = new LinearLayout(getActivity());
         options.setOrientation(LinearLayout.HORIZONTAL);
         options.setGravity(Gravity.CENTER_VERTICAL);
@@ -292,8 +303,13 @@ public final class WifiListFragment extends Fragment {
             return;
         }
         if (!hasScanPermission()) {
-            requestScanPermission();
+            // Explains the state and opens the app settings when the system
+            // no longer shows its own dialog ("don't ask again").
+            handleMissingScanPermission();
             return;
+        }
+        if (permissionFixButton != null) {
+            permissionFixButton.setVisibility(View.GONE);
         }
         if (!wifi.isWifiEnabled()) {
             scanSummary.setText(getString(R.string.wifi_disabled_hint));
@@ -333,7 +349,13 @@ public final class WifiListFragment extends Fragment {
             List<ScanResult> results = wifi.getScanResults();
             entries.clear();
             entries.addAll(NetworkEntry.fromAll(results));
-            scanSummary.setText(getString(R.string.wifi_scan_found, entries.size()));
+            if (entries.isEmpty()) {
+                // "Found 0" alone reads like a malfunction; say what actually
+                // happens (system scan throttling / empty cache).
+                scanSummary.setText(getString(R.string.wifi_scan_found_zero));
+            } else {
+                scanSummary.setText(getString(R.string.wifi_scan_found, entries.size()));
+            }
         } catch (SecurityException denied) {
             entries.clear();
             scanSummary.setText(getString(R.string.wifi_scan_denied_text));
@@ -504,9 +526,19 @@ public final class WifiListFragment extends Fragment {
             return true;
         }
         Context context = host();
-        return context != null
-                && context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
-                == PackageManager.PERMISSION_GRANTED;
+        if (context == null) {
+            return false;
+        }
+        if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
+                == PackageManager.PERMISSION_GRANTED) {
+            return true;
+        }
+        // Android 13+ also accepts NEARBY_WIFI_DEVICES for scan results.
+        if (Build.VERSION.SDK_INT >= 33) {
+            return context.checkSelfPermission(Manifest.permission.NEARBY_WIFI_DEVICES)
+                    == PackageManager.PERMISSION_GRANTED;
+        }
+        return false;
     }
 
     private void requestScanPermission() {
@@ -514,8 +546,62 @@ public final class WifiListFragment extends Fragment {
             scanSummary.setText(getString(R.string.wifi_permission_check_unsupported));
             return;
         }
+        if (Build.VERSION.SDK_INT >= 33) {
+            requestPermissions(new String[]{
+                    Manifest.permission.NEARBY_WIFI_DEVICES,
+                    Manifest.permission.ACCESS_FINE_LOCATION}, REQUEST_WIFI_PERMISSION);
+            return;
+        }
         requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
                 REQUEST_WIFI_PERMISSION);
+    }
+
+    /**
+     * Called whenever a scan runs without the permission: after a "don't ask
+     * again" denial the system silently refuses every new request, so the only
+     * way forward is the app settings page. That state is detected through
+     * shouldShowRequestPermissionRationale() returning false.
+     */
+    private void handleMissingScanPermission() {
+        updatePermissionFixVisibility();
+        if (permissionFixButton != null
+                && permissionFixButton.getVisibility() == View.VISIBLE) {
+            scanSummary.setText(getString(R.string.wifi_permission_denied_permanent));
+            return;
+        }
+        requestScanPermission();
+    }
+
+    /** Shows the settings shortcut only for a permanent ("don't ask again") denial. */
+    private void updatePermissionFixVisibility() {
+        boolean permanentlyDenied = false;
+        Context context = host();
+        if (context != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            String key = Build.VERSION.SDK_INT >= 33
+                    ? Manifest.permission.NEARBY_WIFI_DEVICES
+                    : Manifest.permission.ACCESS_FINE_LOCATION;
+            if (context.checkSelfPermission(key) != PackageManager.PERMISSION_GRANTED
+                    && !shouldShowRequestPermissionRationale(key)) {
+                permanentlyDenied = true;
+            }
+        }
+        if (permissionFixButton != null) {
+            permissionFixButton.setVisibility(permanentlyDenied ? View.VISIBLE : View.GONE);
+        }
+    }
+
+    /** Opens this app's page in the system settings, where the permission can be granted. */
+    private void openAppSettings() {
+        Context context = host();
+        if (context == null) {
+            return;
+        }
+        try {
+            startActivity(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                    android.net.Uri.fromParts("package", context.getPackageName(), null)));
+        } catch (Exception failure) {
+            openWifiPanel();
+        }
     }
 
     @Override
@@ -525,9 +611,13 @@ public final class WifiListFragment extends Fragment {
             return;
         }
         if (results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED) {
+            if (permissionFixButton != null) permissionFixButton.setVisibility(View.GONE);
             startScan();
         } else if (scanSummary != null) {
             scanSummary.setText(getString(R.string.wifi_scan_permission_missing));
+            // Only refresh the "open settings" affordance here; requesting
+            // again right after a denial would loop the system dialog.
+            updatePermissionFixVisibility();
         }
     }
 

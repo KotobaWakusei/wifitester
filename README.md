@@ -90,6 +90,38 @@ WiFiTester 是面向已取得 Root 权限的 Android 设备的 **无线诊断与
 4. 目标 BSSID、客户端 MAC、接口名、路径与 SSID 在拼装命令前都经过严格校验（MAC 格式、接口名字符集、绝对路径、SSID 长度与控制字符），防止把非法输入带进 shell。
 5. 执行日志可随时导出，便于留存审计记录。
 
+## adb 调试桥(仅 debug 构建)
+
+debug 变体内置一个 adb 可驱动的调试桥,release 构建完全不包含此代码(接收器声明在 `app/src/debug/AndroidManifest.xml`)。它可以读取日志、查询状态、触发扫描,并在满足与界面相同的安全护栏(已确认攻击授权 + Root)的前提下执行攻击模块。
+
+安全约束:接收器只响应 root(UID 0)与 adb shell(UID 2000)发出的显式广播;所有命令与输出都落盘审计。
+
+**命令一览**:`status` / `log` / `clear` / `scan` / `attack_start` / `attack_stop` / `attack_status`
+
+```bash
+# 状态(权限、Root、授权、运行中的模块、已解包工具)
+adb shell am broadcast -n me.paranoid.wifikill.debug/me.paranoid.wifikill.DebugBridgeReceiver \
+  -a me.paranoid.wifikill.DEBUG --es cmd status
+
+# 读取桥日志(命令结果、攻击实时输出、logcat 转储都在这里)
+adb shell run-as me.paranoid.wifikill.debug cat files/debug-bridge.log
+
+# 触发一次 Wi-Fi 扫描并列出结果
+adb shell am broadcast -n me.paranoid.wifikill.debug/me.paranoid.wifikill.DebugBridgeReceiver \
+  -a me.paranoid.wifikill.DEBUG --es cmd scan
+
+# 发起断连洪水(需先在应用内创建监听接口,并在设置中确认攻击授权)
+adb shell am broadcast -n me.paranoid.wifikill.debug/me.paranoid.wifikill.DebugBridgeReceiver \
+  -a me.paranoid.wifikill.DEBUG --es cmd attack_start \
+  --es module deauth --es bssid aa:bb:cc:dd:ee:ff --es count 10
+
+# 停止 / 状态
+adb shell am broadcast -n me.paranoid.wifikill.debug/me.paranoid.wifikill.DebugBridgeReceiver \
+  -a me.paranoid.wifikill.DEBUG --es cmd attack_stop
+```
+
+`attack_start` 参数:`module`(`deauth`/`beacon`/`auth`/`handshake`/`crack`/`evil_twin`/`arp_spoof`)、`bssid`、`client`、`channel`、`count`、`ssid`、`passphrase`、`wordlist`、`victim`、`gateway`、`iface`(数据接口)、`mon`(监听接口,默认自动探测)。所有参数都经过与界面相同的 `AttackCommandBuilder` 校验;攻击未授权或无监听接口时会在日志中给出明确拒绝原因。
+
 ## 系统要求
 
 - Android 5.0（API 21）或更高版本；较新的 Android 版本和厂商系统可能施加额外限制。

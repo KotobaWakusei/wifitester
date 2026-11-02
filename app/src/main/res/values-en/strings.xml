@@ -26,9 +26,12 @@
     <string name="wifi_scan_waiting">Waiting for a scan. Android may throttle scan frequency.</string>
     <string name="wifi_scan_requesting">Requesting a system scan…</string>
     <string name="wifi_scan_found">Found %1$d networks</string>
+    <string name="wifi_scan_found_zero">No networks found in this scan. The system throttles scans (about 4 per 2 minutes) — refresh again shortly, and make sure Wi-Fi is on and networks are nearby.</string>
     <string name="wifi_scan_denied">The system denied the scan. Grant the nearby-devices permission and enable location services.</string>
     <string name="wifi_scan_failed">Scan failed: %1$s</string>
     <string name="wifi_scan_permission_missing">The location permission needed for nearby-network scans was not granted. Connection details remain available.</string>
+    <string name="wifi_permission_denied_permanent">The location / nearby-devices permission was denied with "don\'t ask again", so scans will stay empty. Tap the button below to grant it in the system settings.</string>
+    <string name="wifi_permission_open_settings">Open settings</string>
     <string name="wifi_sort_label">Sort</string>
     <string name="wifi_sort_signal">Signal</string>
     <string name="wifi_sort_channel">Channel</string>

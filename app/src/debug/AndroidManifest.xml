@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Debug-build-only manifest entries.
+
+  The adb debug bridge is declared exclusively in the debug source set, so
+  release builds never contain the exported receiver at all. It is intended
+  for development on a personal device: the app is debuggable, so the bridge
+  log is reachable through `adb shell run-as`.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <!--
+            Reachable only through explicit-component broadcasts, which is how
+            `adb shell am broadcast -n ...` delivers. The receiver additionally
+            ignores every command unless it was sent by root/shell, so other
+            apps on the device cannot drive the workbench.
+        -->
+        <receiver
+            android:name="me.paranoid.wifikill.DebugBridgeReceiver"
+            android:exported="true" />
+
+    </application>
+</manifest>

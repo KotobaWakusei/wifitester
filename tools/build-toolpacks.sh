@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -euo pipefail
 
 # Builds the optional tool packages that the app downloads on demand.
@@ -399,8 +399,8 @@ build_iwtools() {
   mkdir -p "$WORK/iwtools"
   tar -xzf "$vendored" -C "$WORK/iwtools" --strip-components=1 || return 1
   cd "$WORK/iwtools" || return 1
-  make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv >/dev/null 2>&1 \
-    || make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv || return 1
+  make BUILD_STATIC=y CC="$CC" CFLAGS="-O2 -include strings.h" iwconfig iwlist iwpriv >/dev/null 2>&1 \
+    || make BUILD_STATIC=y CC="$CC" CFLAGS="-O2 -include strings.h" iwconfig iwlist iwpriv || return 1
   install -m 0755 iwconfig iwlist iwpriv "$PREFIX/bin/" || return 1
 }
 
@@ -415,8 +415,8 @@ build_iwtools() {
   mkdir -p "$WORK/iwtools"
   tar -xzf "$WORK/iwtools.tar.gz" -C "$WORK/iwtools" --strip-components=1 || return 1
   cd "$WORK/iwtools" || return 1
-  make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv >/dev/null 2>&1 \
-    || make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv || return 1
+  make BUILD_STATIC=y CC="$CC" CFLAGS="-O2 -include strings.h" iwconfig iwlist iwpriv >/dev/null 2>&1 \
+    || make BUILD_STATIC=y CC="$CC" CFLAGS="-O2 -include strings.h" iwconfig iwlist iwpriv || return 1
   install -m 0755 iwconfig iwlist iwpriv "$PREFIX/bin/" || return 1
 }
 

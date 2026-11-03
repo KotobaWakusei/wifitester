@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 set -euo pipefail
 
 # Build the Android ARM64 command line tools that ship inside the APK.
@@ -395,8 +395,8 @@ build_iwtools() {
   cd "$WORK/iwtools" || return 1
   # STATIC=1 links libiw statically, so no extra shared library is needed on
   # the device. Build the three tools the osdep layer and the workbench use.
-  make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv >/dev/null 2>&1 \
-    || make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv || return 1
+  make BUILD_STATIC=y CC="$CC" CFLAGS="-O2 -include strings.h" iwconfig iwlist iwpriv >/dev/null 2>&1 \
+    || make BUILD_STATIC=y CC="$CC" CFLAGS="-O2 -include strings.h" iwconfig iwlist iwpriv || return 1
   install -m 0755 iwconfig iwlist iwpriv "$ASSETS/" || return 1
   for tool in iwconfig iwlist iwpriv; do
     "$STRIP" "$ASSETS/$tool"

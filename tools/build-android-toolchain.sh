@@ -383,13 +383,15 @@ build_libnl() {
 # found".
 # --------------------------------------------------------------------------
 build_iwtools() {
-  log "wireless-tools 29"
-  download "$WORK/iwtools.tar.gz" \
-    "http://deb.debian.org/debian/pool/main/w/wireless-tools/wireless-tools_29.orig.tar.gz" \
-    "http://archive.ubuntu.com/ubuntu/pool/main/w/wireless-tools/wireless-tools_29.orig.tar.gz" \
-    "https://distfiles.macports.org/wireless-tools/wireless_tools.29.tar.gz" || return 1
+  log "wireless-tools 30pre9 (vendored)"
+  # Vendored in tools/vendor/: every public download mirror for
+  # wireless-tools is dead (the HPL page is gone, the Debian pool only
+  # carries 30~pre9 and distfiles 404s). A fixed tarball keeps the build
+  # reproducible; license GPL-2.0, same family as this repository.
+  local vendored="$ROOT/tools/vendor/wireless-tools_30-pre9.orig.tar.gz"
+  [[ -f "$vendored" ]] || fatal "vendored wireless-tools tarball missing: $vendored"
   mkdir -p "$WORK/iwtools"
-  tar -xzf "$WORK/iwtools.tar.gz" -C "$WORK/iwtools" --strip-components=1 || return 1
+  tar -xzf "$vendored" -C "$WORK/iwtools" --strip-components=1 || return 1
   cd "$WORK/iwtools" || return 1
   # STATIC=1 links libiw statically, so no extra shared library is needed on
   # the device. Build the three tools the osdep layer and the workbench use.

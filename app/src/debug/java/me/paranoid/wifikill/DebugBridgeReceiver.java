@@ -331,6 +331,10 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
         }
 
         java.io.File captures = new java.io.File(context.getFilesDir(), "attack-captures");
+        if (!captures.isDirectory() && !captures.mkdirs()) {
+            DebugBridgeLog.append("attack_start refused: cannot create the capture directory");
+            return;
+        }
         String captureFile = null;
         if (DebugBridgeCommands.MODULE_CRACK.equals(module)) {
             captureFile = newestCapture(captures);

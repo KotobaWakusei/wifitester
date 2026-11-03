@@ -137,8 +137,9 @@ final class AttackCommandBuilder {
         requireCount(frameCount, 0, MAX_FRAME_COUNT);
         StringBuilder command = new StringBuilder();
         // aireplay-ng takes the capture interface as its trailing positional
-        // argument; there is no "-i" option.
-        command.append(exe).append(" --deauth ").append(frameCount)
+        // argument; there is no "-i" option. --ignore-negative-one keeps the
+        // tool running on nl80211 interfaces where the channel reads as -1.
+        command.append(exe).append(" --ignore-negative-one --deauth ").append(frameCount)
                 .append(" -a ").append(target);
         if (clientMac != null && !clientMac.trim().isEmpty()) {
             command.append(" -c ").append(requireMac(clientMac, R.string.attack_label_client_mac));
@@ -157,8 +158,8 @@ final class AttackCommandBuilder {
         requireCount(frameCount, 0, MAX_FRAME_COUNT);
         StringBuilder command = new StringBuilder();
         // The replay interface is aireplay-ng's positional argument, so it is
-        // appended last after every option.
-        command.append(exe).append(" --fakeauth ").append(frameCount);
+        // appended last after every option. --ignore-negative-one: see deauth.
+        command.append(exe).append(" --ignore-negative-one --fakeauth ").append(frameCount);
         if (bssid != null && !bssid.trim().isEmpty()) {
             command.append(" -a ").append(requireMac(bssid, R.string.attack_label_target_bssid));
         }
@@ -179,7 +180,9 @@ final class AttackCommandBuilder {
         // --fakeauth, --interactive, --arpreplay, --chopchop, --fragment and
         // --test); the trailing "--auth" made every run die in getopt. The
         // closest supported mode is repeated fake authentication.
-        return exe + " --fakeauth " + frameCount + " -a " + target + " " + iface;
+        // The replay interface is aireplay-ng's positional argument, so it is
+        // appended last after every option. --ignore-negative-one: see deauth.
+        return exe + " --ignore-negative-one --fakeauth " + frameCount + " -a " + target + " " + iface;
     }
 
     /**

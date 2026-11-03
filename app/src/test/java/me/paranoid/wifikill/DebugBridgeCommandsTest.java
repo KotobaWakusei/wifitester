@@ -17,7 +17,7 @@ public class DebugBridgeCommandsTest {
                 "aa:bb:cc:dd:ee:ff", null, 6, 10,
                 null, null, null, null, null, null,
                 "/data/prefix", null, "/data/hostapd.conf");
-        assertEquals("aireplay-ng --deauth 10 -a aa:bb:cc:dd:ee:ff wfkmon0", command);
+        assertEquals("aireplay-ng --ignore-negative-one --deauth 10 -a aa:bb:cc:dd:ee:ff wfkmon0", command);
     }
 
     @Test public void deauthWithClientKeepsTheInterfaceLast() {

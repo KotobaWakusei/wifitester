@@ -83,7 +83,7 @@ public class AttackCommandBuilderTest {
         String command = AttackCommandBuilder.deauth(
                 "aireplay-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", null, 10);
         // The replay interface is aireplay-ng's positional argument.
-        assertEquals("aireplay-ng --deauth 10 -a aa:bb:cc:dd:ee:ff wfkmon0", command);
+        assertEquals("aireplay-ng --ignore-negative-one --deauth 10 -a aa:bb:cc:dd:ee:ff wfkmon0", command);
 
         String targeted = AttackCommandBuilder.deauth(
                 "aireplay-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", "11:22:33:44:55:66", 0);
@@ -94,7 +94,7 @@ public class AttackCommandBuilderTest {
     @Test public void buildsBeaconAndAuthFloodCommands() {
         String beacon = AttackCommandBuilder.beaconFlood(
                 "aireplay-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", 5);
-        assertEquals("aireplay-ng --fakeauth 5 -a aa:bb:cc:dd:ee:ff wfkmon0", beacon);
+        assertEquals("aireplay-ng --ignore-negative-one --fakeauth 5 -a aa:bb:cc:dd:ee:ff wfkmon0", beacon);
 
         String auth = AttackCommandBuilder.authFlood(
                 "aireplay-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", 5);

@@ -182,8 +182,18 @@ public final class BundledToolchain {
     public String shellEnvironment() {
         String b = quote(bin.getAbsolutePath());
         String l = quote(lib.getAbsolutePath());
-        return aircrackPathPrelude() + "export PATH=" + b + ":$PATH; export LD_LIBRARY_PATH=" + l
-                + ":\u0024{LD_LIBRARY_PATH:-}; export OPENSSL_CONF=" + l + "/openssl.cnf; ";
+        // aircrack-ng (compiled without libnl) locates iwpriv/iwconfig through
+        // a HARDCODED search path (/sbin, /usr/sbin, /bin, /tmp, ...) that
+        // ignores $PATH - see osdep/linux.c wiToolsPath(). /tmp is on that
+        // list and is root-writable, so stage the bundled wireless tools
+        // there on every shell (the directory may be wiped on reboot).
+        String iwStaging = "mkdir -p /tmp 2>/dev/null; "
+                + "for t in iwconfig iwpriv iwlist; do "
+                + "[ -f " + b + "/$t ] && cp -f " + b + "/$t /tmp/$t 2>/dev/null && "
+                + "chmod 755 /tmp/$t 2>/dev/null; done; ";
+        return aircrackPathPrelude() + iwStaging + "export PATH=" + b + ":$PATH; "
+                + "export LD_LIBRARY_PATH=" + l + ":\u0024{LD_LIBRARY_PATH:-}; "
+                + "export OPENSSL_CONF=" + l + "/openssl.cnf; ";
     }
 
     /**

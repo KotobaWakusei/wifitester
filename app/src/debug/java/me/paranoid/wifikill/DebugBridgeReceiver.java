@@ -36,6 +36,8 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
     static final String CMD_LOG = "log";
     static final String CMD_CLEAR = "clear";
     static final String CMD_SCAN = "scan";
+    static final String CMD_MONITOR_START = "monitor_start";
+    static final String CMD_MONITOR_STOP = "monitor_stop";
     static final String CMD_ATTACK_START = "attack_start";
     static final String CMD_ATTACK_STOP = "attack_stop";
     static final String CMD_ATTACK_STATUS = "attack_status";
@@ -47,6 +49,11 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
     /** The attack started through the bridge, if any. */
     private static volatile RootProcess managedAttack;
     private static volatile String managedModule = "";
+    /** Monitor interface created through the bridge (parent, name, channel). */
+    private static volatile String bridgeMonitorParent = "";
+    private static volatile String bridgeMonitorName = "";
+    private static volatile int bridgeMonitorChannel = 0;
+    private static volatile String bridgeMonitorOriginalState = "down";
 
     @Override
     public void onReceive(Context context, Intent intent) {
@@ -127,6 +134,12 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
             case CMD_SCAN:
                 cmdScan(context);
                 break;
+            case CMD_MONITOR_START:
+                cmdMonitorStart(context, params);
+                break;
+            case CMD_MONITOR_STOP:
+                cmdMonitorStop(context);
+                break;
             case CMD_ATTACK_START:
                 cmdAttackStart(context, params);
                 break;
@@ -139,6 +152,7 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
             case "":
                 DebugBridgeLog.append("no cmd given. commands: " + CMD_STATUS + ", "
                         + CMD_LOG + ", " + CMD_CLEAR + ", " + CMD_SCAN + ", "
+                        + CMD_MONITOR_START + ", " + CMD_MONITOR_STOP + ", "
                         + CMD_ATTACK_START + ", " + CMD_ATTACK_STOP + ", "
                         + CMD_ATTACK_STATUS);
                 break;
@@ -172,6 +186,8 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
         out.append("root: ").append(RootShell.hasRoot(context)).append('\n');
         out.append("monitor_capture_running: ")
                 .append(MonitorCaptureService.isRunning(context)).append('\n');
+        out.append("bridge_monitor: ").append(bridgeMonitorName.isEmpty()
+                ? "(none)" : bridgeMonitorName + " ch" + bridgeMonitorChannel).append('\n');
         RootProcess attack = managedAttack;
         out.append("bridge_attack_running: ").append(attack != null && attack.isAlive());
         if (attack != null && attack.isAlive()) {
@@ -299,13 +315,18 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
 
         String monIface = firstNonEmpty(params, "mon");
         if (monIface.isEmpty() && DebugBridgeCommands.requiresMonitor(module)) {
+            // Prefer the interface this bridge created, then anything the
+            // system reports as type monitor.
+            monIface = bridgeMonitorName;
+        }
+        if (monIface.isEmpty() && DebugBridgeCommands.requiresMonitor(module)) {
             monIface = findMonitorInterface(context);
         }
         if (DebugBridgeCommands.requiresMonitor(module)
                 && (monIface.isEmpty() || !monIface.matches("[A-Za-z0-9_.-]{1,15}"))) {
             DebugBridgeLog.append("attack_start refused: no monitor interface is running. "
-                    + "Start monitor mode in the app (passive monitoring) or pass "
-                    + "--es mon <interface>.");
+                    + "Run monitor_start on the bridge (or start monitor mode in the app), "
+                    + "or pass --es mon <interface>.");
             return;
         }
 
@@ -375,7 +396,119 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
                 + " pid=" + attack.innerPid() + " alive");
     }
 
-    // ---- helpers -----------------------------------------------------------
+    /** Frequency for a channel number; mirrors WifiChannelParser's mapping. */
+    private static int frequencyForChannel(int channel) {
+        if (channel == 14) return 2484;
+        if (channel >= 1 && channel <= 13) return 2407 + channel * 5;
+        if (channel >= 32) return 5000 + channel * 5;
+        return 0;
+    }
+
+    /** First wlan* interface that is not the known monitor interface. */
+    private static String guessParent(String iwOutput, String exclude) {
+        if (iwOutput == null) return "";
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(?m)^\\s*Interface\\s+([A-Za-z0-9_.-]+)\\s*$").matcher(iwOutput);
+        while (matcher.find()) {
+            String name = matcher.group(1);
+            if (name.equals(exclude) || name.startsWith("wfkmon")) continue;
+            if (name.startsWith("wlan")) return name;
+        }
+        return "";
+    }
+
+    private static String trimLines(String text, int max) {
+        return text.length() <= max ? text : text.substring(text.length() - max);
+    }
+
+    // ---- monitor mode (bridge-managed) -------------------------------------
+
+    private static void cmdMonitorStart(Context context, Bundle params) {
+        IwMonitorModeBackend backend = new IwMonitorModeBackend(context);
+        if (!bridgeMonitorName.isEmpty()) {
+            DebugBridgeLog.append("monitor_start: already running on " + bridgeMonitorName
+                    + " (channel " + bridgeMonitorChannel + "); send monitor_stop first");
+            return;
+        }
+        // Reuse a monitor interface that exists but is not tracked (e.g. left
+        // behind by an earlier session).
+        String existing = findMonitorInterface(context);
+        if (!existing.isEmpty()) {
+            RootShell.Result devices = RootShell.run(context, "iw dev 2>&1", RootShell.TIMEOUT_SHORT);
+            bridgeMonitorName = existing;
+            bridgeMonitorParent = guessParent(devices.output, existing);
+            DebugBridgeLog.append("monitor_start: reusing existing monitor interface "
+                    + existing);
+            return;
+        }
+        int channel = parseInt(params.getString("channel"), 6);
+        if (frequencyForChannel(channel) == 0) {
+            DebugBridgeLog.append("monitor_start refused: unsupported channel " + channel
+                    + " (use 1-14 or 32+)");
+            return;
+        }
+        RootShell.Result devices = RootShell.run(context, "iw dev 2>&1", RootShell.TIMEOUT_SHORT);
+        String parent = firstNonEmpty(params, "parent");
+        if (parent.isEmpty()) {
+            parent = guessParent(devices.output, "");
+        }
+        if (parent.isEmpty()) {
+            DebugBridgeLog.append("monitor_start refused: no parent interface found in iw dev");
+            return;
+        }
+        // Read the parent's link state so the stop command can restore it.
+        RootShell.Result link = RootShell.run(context,
+                "ip -o link show dev '" + parent + "' 2>&1", RootShell.TIMEOUT_SHORT);
+        String state = InterfaceStateParser.parseAdministrativeState(
+                link.output == null ? "" : link.output);
+        bridgeMonitorOriginalState = state == null ? "down" : state;
+        bridgeMonitorParent = parent;
+        bridgeMonitorChannel = channel;
+
+        // Probe once for the Qualcomm con_mode switch, like the monitor UI.
+        RootShell.Result probe = RootShell.run(context, backend.probeCommand(), 20000);
+        String probeOut = probe.output == null ? "" : probe.output;
+        String conModePath = probeOut.contains("CON_MODE:")
+                ? IwMonitorModeBackend.parseConModePath(probeOut) : null;
+
+        WifiChannelParser.Channel channelInfo = new WifiChannelParser.Channel(
+                channel, frequencyForChannel(channel), "ch" + channel);
+        String command = backend.buildStartCommand(parent, "wfkmon0", channelInfo, conModePath);
+        DebugBridgeLog.append("monitor_start: parent=" + parent + " channel=" + channel
+                + (conModePath != null ? " (con_mode path present)" : ""));
+        RootShell.Result result = RootShell.run(context, command, 30000);
+        String output = result.output == null ? "" : result.output;
+        if (result.code == 0 && output.contains("MONITOR_READY")) {
+            bridgeMonitorName = output.contains("MONITOR_PARENT_MODE") ? parent : "wfkmon0";
+            DebugBridgeLog.append("monitor_start: READY on " + bridgeMonitorName
+                    + " channel " + channel);
+        } else {
+            DebugBridgeLog.appendBlock("monitor_start failed (exit " + result.code + "):\n"
+                    + trimLines(output, 3000));
+            bridgeMonitorName = "";
+            bridgeMonitorParent = "";
+        }
+    }
+
+    private static void cmdMonitorStop(Context context) {
+        if (bridgeMonitorName.isEmpty()) {
+            DebugBridgeLog.append("monitor_stop: nothing is running");
+            return;
+        }
+        IwMonitorModeBackend backend = new IwMonitorModeBackend(context);
+        String stopCommand = backend.buildStopCommand(bridgeMonitorParent, bridgeMonitorName,
+                bridgeMonitorOriginalState, null);
+        RootShell.Result result = RootShell.run(context, stopCommand, 15000);
+        DebugBridgeLog.append("monitor_stop: exit " + result.code
+                + (result.output == null ? "" : "\n" + trimLines(result.output, 1200)));
+        bridgeMonitorName = "";
+        bridgeMonitorParent = "";
+        bridgeMonitorChannel = 0;
+        // The start script disabled Wi-Fi; ask for a reconnect like the UI does.
+        WifiRecovery.requestReconnect(context);
+    }
+
+    // ---- helpers (existing) ------------------------------------------------
 
     /** The interface whose iw block says "type monitor", or "". */
     private static String findMonitorInterface(Context context) {

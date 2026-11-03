@@ -93,19 +93,28 @@ public final class BundledToolchain {
         }
         String assetDir = ASSET_ROOT + ABI;
         try {
-            String[] entries = context.getAssets().list(assetDir);
-            if (entries == null || entries.length == 0) {
+            // Walk the asset tree recursively: the build packages shared
+            // libraries under a lib/ subdirectory, and Assets.list() reports
+            // directories as plain names - treating them as files made every
+            // aircrack-ng binary fail to link on the device
+            // ("library libaircrack-osdep-1.7.0.so not found").
+            List<String[]> files = new ArrayList<>();
+            collectAssetFiles(assetDir, "", files);
+            if (files.isEmpty()) {
                 return new InstallResult(installed, errors,
                         context.getString(R.string.bundled_missing, assetDir));
             }
-            for (String name : entries) {
+            for (String[] entry : files) {
+                String relative = entry[0];
+                String name = relative.substring(relative.lastIndexOf('/') + 1);
                 if (!name.matches("[A-Za-z0-9_.+-]+")) {
                     errors.add(context.getString(R.string.bundled_skip_name, name));
                     continue;
                 }
-                boolean isLibrary = name.endsWith(".so") || name.contains(".so.");
+                boolean isLibrary = relative.startsWith("lib/")
+                        || name.endsWith(".so") || name.contains(".so.");
                 File target = new File(isLibrary ? lib : bin, name);
-                try (InputStream in = context.getAssets().open(assetDir + "/" + name)) {
+                try (InputStream in = context.getAssets().open(assetDir + "/" + relative)) {
                     File temp = new File(target.getParentFile(), name + ".new");
                     try (FileOutputStream out = new FileOutputStream(temp)) {
                         byte[] buffer = new byte[16384];
@@ -152,6 +161,22 @@ public final class BundledToolchain {
         }
         return new InstallResult(installed, errors,
                 installed.isEmpty() ? context.getString(R.string.bundled_none_found) : context.getString(R.string.bundled_installed));
+    }
+
+    /** Recursively collects asset file paths relative to the ABI directory. */
+    private void collectAssetFiles(String base, String relative, List<String[]> out)
+            throws java.io.IOException {
+        String path = relative.isEmpty() ? base : base + "/" + relative;
+        String[] entries = context.getAssets().list(path);
+        if (entries == null || entries.length == 0) {
+            if (!relative.isEmpty()) {
+                out.add(new String[]{relative});
+            }
+            return;
+        }
+        for (String name : entries) {
+            collectAssetFiles(base, relative.isEmpty() ? name : relative + "/" + name, out);
+        }
     }
 
     public String shellEnvironment() {

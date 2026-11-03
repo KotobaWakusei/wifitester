@@ -386,7 +386,38 @@ packed=0
 try_pack() {
   if pack "$@"; then packed=$((packed + 1)); fi
 }
-try_pack aircrack aircrack-ng airodump-ng aireplay-ng airmon-ng
+# wireless-tools: aircrack-ng built without libnl initializes the card
+# through iwconfig, so the package must ship the classic tools too.
+build_iwtools() {
+  log "wireless-tools 29"
+  download "$WORK/iwtools.tar.gz" \
+    "https://distfiles.macports.org/wireless-tools/wireless_tools.29.tar.gz" \
+    "http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/wireless_tools.29.tar.gz" || return 1
+  mkdir -p "$WORK/iwtools"
+  tar -xzf "$WORK/iwtools.tar.gz" -C "$WORK/iwtools" --strip-components=1 || return 1
+  cd "$WORK/iwtools" || return 1
+  make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv >/dev/null 2>&1 \
+    || make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv || return 1
+  install -m 0755 iwconfig iwlist iwpriv "$PREFIX/bin/" || return 1
+}
+
+# wireless-tools: aircrack-ng built without libnl initializes the card
+# through iwconfig, so the package must ship the classic tools too.
+build_iwtools() {
+  log "wireless-tools 29"
+  download "$WORK/iwtools.tar.gz" \
+    "https://distfiles.macports.org/wireless-tools/wireless_tools.29.tar.gz" \
+    "http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/wireless_tools.29.tar.gz" || return 1
+  mkdir -p "$WORK/iwtools"
+  tar -xzf "$WORK/iwtools.tar.gz" -C "$WORK/iwtools" --strip-components=1 || return 1
+  cd "$WORK/iwtools" || return 1
+  make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv >/dev/null 2>&1 \
+    || make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv || return 1
+  install -m 0755 iwconfig iwlist iwpriv "$PREFIX/bin/" || return 1
+}
+
+step wireless-tools build_iwtools
+try_pack aircrack aircrack-ng airodump-ng aireplay-ng airmon-ng iwconfig iwlist iwpriv
 try_pack hostapd hostapd
 try_pack reaver reaver wash
 

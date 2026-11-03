@@ -377,6 +377,30 @@ build_libnl() {
 }
 
 # --------------------------------------------------------------------------
+# wireless-tools (iwconfig/iwlist/iwpriv): aircrack-ng compiled without
+# libnl initializes the wireless card through these classic tools. Without
+# them airodump-ng exits with "Required wireless tools ... could not be
+# found".
+# --------------------------------------------------------------------------
+build_iwtools() {
+  log "wireless-tools 29"
+  download "$WORK/iwtools.tar.gz" \
+    "https://distfiles.macports.org/wireless-tools/wireless_tools.29.tar.gz" \
+    "http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/wireless_tools.29.tar.gz" || return 1
+  mkdir -p "$WORK/iwtools"
+  tar -xzf "$WORK/iwtools.tar.gz" -C "$WORK/iwtools" --strip-components=1 || return 1
+  cd "$WORK/iwtools" || return 1
+  # STATIC=1 links libiw statically, so no extra shared library is needed on
+  # the device. Build the three tools the osdep layer and the workbench use.
+  make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv >/dev/null 2>&1 \
+    || make STATIC=1 CC="$CC" CFLAGS="-O2" iwconfig iwlist iwpriv || return 1
+  install -m 0755 iwconfig iwlist iwpriv "$ASSETS/" || return 1
+  for tool in iwconfig iwlist iwpriv; do
+    "$STRIP" "$ASSETS/$tool"
+  done
+}
+
+# --------------------------------------------------------------------------
 # hostapd (rogue access point)
 # --------------------------------------------------------------------------
 build_hostapd() {
@@ -474,6 +498,9 @@ run_step "tcpdump" build_tcpdump || true
 
 # The remaining tools depend on the crypto backend.
 if run_step "openssl" build_openssl; then
+  # wireless-tools must be in the bundled bin directory before aircrack-ng:
+  # its osdep layer execs iwconfig to initialize the interface.
+  run_step "wireless-tools" build_iwtools || true
   run_step "aircrack-ng" build_aircrack || true
   # hostapd's nl80211 backend needs the statically cross-compiled libnl
   # produced by build_libnl(); a failure here skips hostapd alone instead

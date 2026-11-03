@@ -104,6 +104,19 @@ public class AttackCommandBuilderTest {
         assertTrue(auth.endsWith("wfkmon0"));
     }
 
+    @Test public void beaconFloodUsesTheDedicatedInjector() {
+        String command = AttackCommandBuilder.beaconFlood(
+                "beaconflood", "wfkmon0", null, 0);
+        // Empty target falls back to the default SSID; 30 s bounded run.
+        assertEquals("beaconflood -i wfkmon0 -s '114514' -d 30", command);
+
+        String named = AttackCommandBuilder.beaconFlood(
+                "beaconflood", "wfkmon0", "lab", 40);
+        assertTrue(named.contains("-s 'lab'"));
+        assertTrue(named.contains("-n 40"));
+        assertTrue(named.contains("-d 30"));
+    }
+
     @Test public void buildsHandshakeCaptureCommand() {
         String command = AttackCommandBuilder.captureHandshake(
                 "airodump-ng", "wfkmon0", "aa:bb:cc:dd:ee:ff", 6, "/data/user/0/app/files/out");

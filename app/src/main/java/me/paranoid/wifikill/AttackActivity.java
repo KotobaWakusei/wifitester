@@ -729,8 +729,10 @@ public final class AttackActivity extends BaseActivity {
                 return AttackCommandBuilder.deauth("aireplay-ng", monitorInterface,
                         bssid, client, count);
             case AttackCatalog.ID_BEACON:
-                return AttackCommandBuilder.beaconFlood("aireplay-ng", monitorInterface,
-                        bssid, count);
+                // The beacon module runs the bundled dedicated injector
+                // (aireplay-ng has no beacon flood mode).
+                return AttackCommandBuilder.beaconFlood("beaconflood", monitorInterface,
+                        ssid, count);
             case AttackCatalog.ID_AUTH:
                 return AttackCommandBuilder.authFlood("aireplay-ng", monitorInterface,
                         bssid, count);

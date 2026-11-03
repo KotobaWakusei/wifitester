@@ -153,6 +153,30 @@ final class AttackCommandBuilder {
      * that clients keep seeing it, or with a random source for a pure flood.
      */
     static String beaconFlood(String tool, String interfaceName, String bssid, int frameCount) {
+        if ("beaconflood".equals(tool)) {
+            // The dedicated injector: SSID via -s, access-point count via -n,
+            // a bounded 30 s run. frameCount maps to the AP count (0 keeps
+            // the tool default of 20).
+            String exe = requireTool(tool);
+            String iface = requireInterface(interfaceName);
+            String ssid = (bssid == null || bssid.trim().isEmpty())
+                    ? "114514" : bssid.trim();
+            StringBuilder command = new StringBuilder();
+            command.append(exe).append(" -i ").append(iface);
+            command.append(" -s ").append(quote(requireSsid(ssid)));
+            command.append(" -d 30");
+            if (frameCount > 0) {
+                requireCount(frameCount, 1, 100);
+                command.append(" -n ").append(frameCount);
+            }
+            return command.toString();
+        }
+        return aireplayBeaconFlood(tool, interfaceName, bssid, frameCount);
+    }
+
+    /** Legacy aireplay-ng variant kept for the unit tests of the builder. */
+    static String aireplayBeaconFlood(String tool, String interfaceName,
+                                      String bssid, int frameCount) {
         String exe = requireTool(tool);
         String iface = requireInterface(interfaceName);
         requireCount(frameCount, 0, MAX_FRAME_COUNT);

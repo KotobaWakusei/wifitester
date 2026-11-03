@@ -476,6 +476,23 @@ build_arpspoof() {
 }
 
 # --------------------------------------------------------------------------
+# beaconflood (bundled source): beacon injector for the beacon module of the
+# attack workbench (aireplay-ng has no beacon flood mode).
+# --------------------------------------------------------------------------
+build_beaconflood() {
+  log "beaconflood (bundled source)"
+  local source="$ROOT/tools/native/beaconflood.c"
+  [[ -f "$source" ]] || fatal "missing $source"
+  "$CC" -O2 -fPIE -pie \
+    -o "$WORK/beaconflood" "$source"
+  "$STRIP" "$WORK/beaconflood"
+  if ! tls_ok "$WORK/beaconflood"; then
+    fatal "beaconflood: PT_TLS is underaligned or skewed"
+  fi
+  install -m 0755 "$WORK/beaconflood" "$ASSETS/beaconflood" || return 1
+}
+
+# --------------------------------------------------------------------------
 # main
 # --------------------------------------------------------------------------
 run_step() {
@@ -516,6 +533,8 @@ fi
 # arpspoof is built from the sources in this repository and needs no
 # external dependency, so it is built even without the other tools.
 run_step "arpspoof" build_arpspoof || true
+# beaconflood likewise (beacon module of the attack workbench).
+run_step "beaconflood" build_beaconflood || true
 
 log "verifying TLS alignment of bundled executables"
 for binary in "$ASSETS"/*; do

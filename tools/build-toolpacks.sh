@@ -406,8 +406,9 @@ build_iwtools() {
 build_iwtools() {
   log "wireless-tools 29"
   download "$WORK/iwtools.tar.gz" \
-    "https://distfiles.macports.org/wireless-tools/wireless_tools.29.tar.gz" \
-    "http://www.hpl.hp.com/personal/Jean_Tourrilhes/Linux/wireless_tools.29.tar.gz" || return 1
+    "http://deb.debian.org/debian/pool/main/w/wireless-tools/wireless-tools_29.orig.tar.gz" \
+    "http://archive.ubuntu.com/ubuntu/pool/main/w/wireless-tools/wireless-tools_29.orig.tar.gz" \
+    "https://distfiles.macports.org/wireless-tools/wireless_tools.29.tar.gz" || return 1
   mkdir -p "$WORK/iwtools"
   tar -xzf "$WORK/iwtools.tar.gz" -C "$WORK/iwtools" --strip-components=1 || return 1
   cd "$WORK/iwtools" || return 1

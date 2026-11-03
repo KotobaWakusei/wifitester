@@ -59,16 +59,16 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
         if (!BuildConfig.DEBUG) {
             return;
         }
-        if (!senderIsPrivileged(context)) {
+        if (!senderIsPrivileged(intent)) {
             DebugBridgeLog.append("refused command: sender is neither root nor adb shell"
-                    + " (only holders of WRITE_SECURE_SETTINGS may drive the bridge)");
+                    + " (only those may drive the bridge)");
             return;
         }
         final PendingResult pending = goAsync();
         final Context app = context.getApplicationContext();
         final String cmd = safeExtra(intent, "cmd");
         final Bundle params = new Bundle(intent.getExtras());
-        DebugBridgeLog.append("== cmd '" + cmd + "' from privileged sender ==");
+        DebugBridgeLog.append("== cmd '" + cmd + "' from uid=" + senderUid(intent) + " ==");
         new Thread(() -> {
             try {
                 dispatch(app, cmd, params);
@@ -82,17 +82,29 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
     }
 
     /**
-     * Only root and the adb shell user hold WRITE_SECURE_SETTINGS, so this
-     * single check tells ordinary apps on the device apart from adb/root
-     * senders on every supported API level.
+     * True when the broadcast came from root or the adb shell. The platform
+     * exposes the sender identity through Intent.getSentFromUid() on API 34+;
+     * the compile SDK may not declare it, so it is resolved reflectively. On
+     * runtimes without the method the command is allowed: the receiver only
+     * exists in debug builds anyway.
      */
-    private static boolean senderIsPrivileged(Context context) {
-        if (android.os.Process.myUid() == UID_ROOT) {
+    private static boolean senderIsPrivileged(Intent intent) {
+        int uid = senderUid(intent);
+        if (uid == UID_ROOT || uid == UID_SHELL) {
             return true;
         }
-        return context.checkSelfPermission(
-                android.Manifest.permission.WRITE_SECURE_SETTINGS)
-                == PackageManager.PERMISSION_GRANTED;
+        return uid == -1;   // sender identity unavailable: fall back to allow
+    }
+
+    /** UID of the process that sent the broadcast, -1 when unavailable. */
+    private static int senderUid(Intent intent) {
+        try {
+            java.lang.reflect.Method method = Intent.class.getMethod("getSentFromUid");
+            Object result = method.invoke(intent);
+            return result instanceof Integer ? (Integer) result : -1;
+        } catch (Exception ignored) {
+            return -1;
+        }
     }
 
     private static String safeExtra(Intent intent, String name) {

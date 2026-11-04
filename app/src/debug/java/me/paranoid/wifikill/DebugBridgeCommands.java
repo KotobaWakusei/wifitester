@@ -66,8 +66,11 @@ final class DebugBridgeCommands {
                 return AttackCommandBuilder.deauth("aireplay-ng", monIface,
                         bssid, client, count);
             case MODULE_BEACON:
-                return AttackCommandBuilder.beaconFlood("aireplay-ng", monIface,
-                        bssid, count);
+                // The beacon module runs the bundled dedicated injector
+                // (beaconflood); the ssid extra is the SSID to advertise and
+                // count maps to the number of access points.
+                return AttackCommandBuilder.beaconFlood("beaconflood", monIface,
+                        ssid, count);
             case MODULE_AUTH:
                 return AttackCommandBuilder.authFlood("aireplay-ng", monIface,
                         bssid, count);

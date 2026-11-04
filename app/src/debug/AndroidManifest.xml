@@ -12,11 +12,19 @@
     <application>
 
         <!--
-            Reachable only through explicit-component broadcasts, which is how
-            `adb shell am broadcast -n ...` delivers. The receiver additionally
-            ignores every command unless it was sent by root/shell, so other
-            apps on the device cannot drive the workbench.
+            Reachable only through explicit components, which is how
+            `adb shell am start -n ...` delivers. An activity start wakes the
+            process immediately, unlike manifest broadcasts which recent
+            Android releases defer for backgrounded apps. The activity
+            additionally ignores every command in release builds.
         -->
+        <activity
+            android:name="me.paranoid.wifikill.BridgeActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.NoDisplay" />
+
         <receiver
             android:name="me.paranoid.wifikill.DebugBridgeReceiver"
             android:exported="true" />

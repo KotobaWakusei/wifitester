@@ -12,21 +12,21 @@ import java.util.List;
 /**
  * adb-driven debug bridge (debug builds only).
  *
- * <p>The receiver is declared in {@code app/src/debug/AndroidManifest.xml}, so
- * release builds do not contain it at all. It is driven from the host with
- * explicit-component broadcasts:</p>
+ * <p>The receiver and {@link BridgeActivity} are declared in
+ * {@code app/src/debug/AndroidManifest.xml}, so release builds do not
+ * contain them at all. They are driven from the host with explicit
+ * components:</p>
  *
  * <pre>
- * adb shell am broadcast -n me.paranoid.wifikill.debug/me.paranoid.wifikill.DebugBridgeReceiver \
- *   -a me.paranoid.wifikill.DEBUG --es cmd status
- *
+ * adb shell am start -n me.paranoid.wifikill.debug/me.paranoid.wifikill.BridgeActivity
+ *   --es cmd status
  * adb shell run-as me.paranoid.wifikill.debug cat files/debug-bridge.log
  * </pre>
  *
- * <p>Safety rails: the receiver ignores everything unless the sender is root
- * or the adb shell user, and attack commands additionally require the same
- * "attack authorized" acknowledgement the UI enforces. Every command and every
- * answer is appended to {@link DebugBridgeLog} for audit.</p>
+ * <p>Safety rails: the components ignore everything unless the sender is
+ * root or the adb shell user, and attack commands additionally require the
+ * same "attack authorized" acknowledgement the UI enforces. Every command
+ * and every answer is appended to {@link DebugBridgeLog} for audit.</p>
  */
 public final class DebugBridgeReceiver extends BroadcastReceiver {
 
@@ -54,7 +54,11 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
     private static volatile String bridgeMonitorName = "";
     private static volatile int bridgeMonitorChannel = 0;
     private static volatile String bridgeMonitorOriginalState = "down";
-    /** Serial command worker: onReceive enqueues and returns at once. */
+
+    /**
+     * Serial command worker: enqueue() returns at once and commands are
+     * processed one at a time in submission order.
+     */
     private static final java.util.concurrent.ExecutorService WORKER =
             java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
                 Thread thread = new Thread(r, "wifitester-debug-bridge");
@@ -78,52 +82,33 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
                     + " (only those may drive the bridge)");
             return;
         }
-        final PendingResult pending = goAsync();
+        // The receiver path is kept for compatibility; the reliable entry is
+        // BridgeActivity (see its javadoc for why broadcasts are avoided).
+        enqueue(context, intent);
+    }
+
+    /**
+     * Hands one command to the serial bridge worker. Shared by the manifest
+     * receiver and the bridge activity. enqueue() returns at once: manifest
+     * receivers are delivered serially, and holding the slot for a 30-50 s
+     * root script made the system DEFER every following broadcast
+     * ("blocked until 0"). A single worker thread keeps the command order
+     * while unblocking the delivery.
+     */
+    static void enqueue(Context context, Intent intent) {
+        DebugBridgeLog.init(context);
         final Context app = context.getApplicationContext();
         final String cmd = safeExtra(intent, "cmd");
         final Bundle params = new Bundle(intent.getExtras());
-        DebugBridgeLog.append("== cmd '" + cmd + "' from uid=" + senderUid(intent) + " ==");
-        new Thread(() -> {
+        DebugBridgeLog.append("== cmd '" + cmd + "' ==");
+        WORKER.execute(() -> {
             try {
                 dispatch(app, cmd, params);
             } catch (Exception failure) {
                 DebugBridgeLog.append("command failed: "
                         + failure.getClass().getSimpleName() + ": " + failure.getMessage());
-            } finally {
-                pending.finish();
             }
-        }, "wifitester-debug-bridge").start();
-    }
-
-    /**
-     * True when the broadcast came from root or the adb shell. The platform
-     * exposes the sender identity through Intent.getSentFromUid() on API 34+;
-     * the compile SDK may not declare it, so it is resolved reflectively. On
-     * runtimes without the method the command is allowed: the receiver only
-     * exists in debug builds anyway.
-     */
-    private static boolean senderIsPrivileged(Intent intent) {
-        int uid = senderUid(intent);
-        if (uid == UID_ROOT || uid == UID_SHELL) {
-            return true;
-        }
-        return uid == -1;   // sender identity unavailable: fall back to allow
-    }
-
-    /** UID of the process that sent the broadcast, -1 when unavailable. */
-    private static int senderUid(Intent intent) {
-        try {
-            java.lang.reflect.Method method = Intent.class.getMethod("getSentFromUid");
-            Object result = method.invoke(intent);
-            return result instanceof Integer ? (Integer) result : -1;
-        } catch (Exception ignored) {
-            return -1;
-        }
-    }
-
-    private static String safeExtra(Intent intent, String name) {
-        String value = intent.getStringExtra(name);
-        return value == null ? "" : value.trim();
+        });
     }
 
     private static void dispatch(Context context, String cmd, Bundle params) {
@@ -188,7 +173,7 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
             out.append("permission post_notifications: ")
                     .append(granted(context, android.Manifest.permission.POST_NOTIFICATIONS)).append('\n');
         }
-        out.append("location_mode: ").append(readSetting(context, "secure", "location_mode")).append('\n');
+        out.append("location_mode: ").append(readSetting(context, "location_mode")).append('\n');
         out.append("attack_authorized: ").append(SettingsStore.attackAuthorized(context)).append('\n');
         out.append("root: ").append(RootShell.hasRoot(context)).append('\n');
         out.append("monitor_capture_running: ")
@@ -329,12 +314,29 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
         if (monIface.isEmpty() && DebugBridgeCommands.requiresMonitor(module)) {
             monIface = findMonitorInterface(context);
         }
-        if (DebugBridgeCommands.requiresMonitor(module)
-                && (monIface.isEmpty() || !monIface.matches("[A-Za-z0-9_.-]{1,15}"))) {
-            DebugBridgeLog.append("attack_start refused: no monitor interface is running. "
-                    + "Run monitor_start on the bridge (or start monitor mode in the app), "
-                    + "or pass --es mon <interface>.");
-            return;
+        if (DebugBridgeCommands.requiresMonitor(module)) {
+            if (monIface.isEmpty() || !monIface.matches("[A-Za-z0-9_.-]{1,15}")) {
+                DebugBridgeLog.append("attack_start refused: no monitor interface is running. "
+                        + "Run monitor_start on the bridge (or start monitor mode in the app), "
+                        + "or pass --es mon <interface>.");
+                return;
+            }
+            if (!interfaceExists(context, monIface)) {
+                // The tracked interface vanished (driver reset while the
+                // radio was disabled). Recreate it once automatically.
+                DebugBridgeLog.append("attack_start: monitor interface " + monIface
+                        + " has vanished; recreating");
+                bridgeMonitorName = "";
+                bridgeMonitorParent = "";
+                cmdMonitorStart(context, params);
+                monIface = bridgeMonitorName;
+                if (monIface.isEmpty()
+                        || !monIface.matches("[A-Za-z0-9_.-]{1,15}")) {
+                    DebugBridgeLog.append("attack_start refused: monitor interface "
+                            + "could not be recreated");
+                    return;
+                }
+            }
         }
 
         java.io.File captures = new java.io.File(context.getFilesDir(), "attack-captures");
@@ -407,39 +409,24 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
                 + " pid=" + attack.innerPid() + " alive");
     }
 
-    /** Frequency for a channel number; mirrors WifiChannelParser's mapping. */
-    private static int frequencyForChannel(int channel) {
-        if (channel == 14) return 2484;
-        if (channel >= 1 && channel <= 13) return 2407 + channel * 5;
-        if (channel >= 32) return 5000 + channel * 5;
-        return 0;
-    }
-
-    /** First wlan* interface that is not the known monitor interface. */
-    private static String guessParent(String iwOutput, String exclude) {
-        if (iwOutput == null) return "";
-        java.util.regex.Matcher matcher = java.util.regex.Pattern
-                .compile("(?m)^\\s*Interface\\s+([A-Za-z0-9_.-]+)\\s*$").matcher(iwOutput);
-        while (matcher.find()) {
-            String name = matcher.group(1);
-            if (name.equals(exclude) || name.startsWith("wfkmon")) continue;
-            if (name.startsWith("wlan")) return name;
-        }
-        return "";
-    }
-
-    private static String trimLines(String text, int max) {
-        return text.length() <= max ? text : text.substring(text.length() - max);
-    }
-
     // ---- monitor mode (bridge-managed) -------------------------------------
 
     private static void cmdMonitorStart(Context context, Bundle params) {
         IwMonitorModeBackend backend = new IwMonitorModeBackend(context);
         if (!bridgeMonitorName.isEmpty()) {
-            DebugBridgeLog.append("monitor_start: already running on " + bridgeMonitorName
-                    + " (channel " + bridgeMonitorChannel + "); send monitor_stop first");
-            return;
+            // Self-heal: the interface may have vanished behind our back
+            // (bionic drivers tear virtual interfaces down when the parent
+            // radio is disabled). Only report "already running" if it is
+            // really still there.
+            if (interfaceExists(context, bridgeMonitorName)) {
+                DebugBridgeLog.append("monitor_start: already running on " + bridgeMonitorName
+                        + " (channel " + bridgeMonitorChannel + "); send monitor_stop first");
+                return;
+            }
+            DebugBridgeLog.append("monitor_start: tracked interface " + bridgeMonitorName
+                    + " has vanished; recreating");
+            bridgeMonitorName = "";
+            bridgeMonitorParent = "";
         }
         // Reuse a monitor interface that exists but is not tracked (e.g. left
         // behind by an earlier session).
@@ -519,7 +506,27 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
         WifiRecovery.requestReconnect(context);
     }
 
-    // ---- helpers (existing) ------------------------------------------------
+    // ---- helpers -----------------------------------------------------------
+
+    /** Frequency for a channel number; mirrors WifiChannelParser's mapping. */
+    private static int frequencyForChannel(int channel) {
+        if (channel == 14) return 2484;
+        if (channel >= 1 && channel <= 13) return 2407 + channel * 5;
+        if (channel >= 32) return 5000 + channel * 5;
+        return 0;
+    }
+
+    /** True when `ip link show dev <name>` reports the interface exists. */
+    private static boolean interfaceExists(Context context, String name) {
+        if (name == null || !name.matches("[A-Za-z0-9_.-]{1,15}")) {
+            return false;
+        }
+        RootShell.Result link = RootShell.run(context,
+                "ip link show dev '" + name + "' 2>&1", RootShell.TIMEOUT_SHORT);
+        String output = link.output == null ? "" : link.output;
+        return link.code == 0 && !output.contains("does not exist")
+                && !output.contains("No such device");
+    }
 
     /** The interface whose iw block says "type monitor", or "". */
     private static String findMonitorInterface(Context context) {
@@ -533,6 +540,19 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
             if (nameInBlock.find() && typeInBlock.find()) {
                 return nameInBlock.group(1);
             }
+        }
+        return "";
+    }
+
+    /** First wlan* interface that is not the known monitor interface. */
+    private static String guessParent(String iwOutput, String exclude) {
+        if (iwOutput == null) return "";
+        java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(?m)^\\s*Interface\\s+([A-Za-z0-9_.-]+)\\s*$").matcher(iwOutput);
+        while (matcher.find()) {
+            String name = matcher.group(1);
+            if (name.equals(exclude) || name.startsWith("wfkmon")) continue;
+            if (name.startsWith("wlan")) return name;
         }
         return "";
     }
@@ -577,13 +597,48 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
                 == PackageManager.PERMISSION_GRANTED ? "granted" : "DENIED";
     }
 
-    private static String readSetting(Context context, String namespace, String key) {
+    private static String readSetting(Context context, String key) {
         try {
             String value = android.provider.Settings.Secure.getString(
                     context.getContentResolver(), key);
             return value == null ? "?" : value;
         } catch (Exception ignored) {
             return "?";
+        }
+    }
+
+    private static String safeExtra(Intent intent, String name) {
+        String value = intent.getStringExtra(name);
+        return value == null ? "" : value.trim();
+    }
+
+    private static String trimLines(String text, int max) {
+        return text.length() <= max ? text : text.substring(text.length() - max);
+    }
+
+    /**
+     * True when the broadcast came from root or the adb shell. The platform
+     * exposes the sender identity through Intent.getSentFromUid() on API 34+;
+     * the compile SDK may not declare it, so it is resolved reflectively. On
+     * runtimes without the method the command is allowed: the receiver only
+     * exists in debug builds anyway.
+     */
+    private static boolean senderIsPrivileged(Intent intent) {
+        int uid = senderUid(intent);
+        if (uid == UID_ROOT || uid == UID_SHELL) {
+            return true;
+        }
+        return uid == -1;   // sender identity unavailable: fall back to allow
+    }
+
+    /** UID of the process that sent the broadcast, -1 when unavailable. */
+    private static int senderUid(Intent intent) {
+        try {
+            java.lang.reflect.Method method = Intent.class.getMethod("getSentFromUid");
+            Object result = method.invoke(intent);
+            return result instanceof Integer ? (Integer) result : -1;
+        } catch (Exception ignored) {
+            return -1;
         }
     }
 }

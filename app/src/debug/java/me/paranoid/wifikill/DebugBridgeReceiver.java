@@ -54,6 +54,13 @@ public final class DebugBridgeReceiver extends BroadcastReceiver {
     private static volatile String bridgeMonitorName = "";
     private static volatile int bridgeMonitorChannel = 0;
     private static volatile String bridgeMonitorOriginalState = "down";
+    /** Serial command worker: onReceive enqueues and returns at once. */
+    private static final java.util.concurrent.ExecutorService WORKER =
+            java.util.concurrent.Executors.newSingleThreadExecutor(r -> {
+                Thread thread = new Thread(r, "wifitester-debug-bridge");
+                thread.setDaemon(true);
+                return thread;
+            });
 
     @Override
     public void onReceive(Context context, Intent intent) {
